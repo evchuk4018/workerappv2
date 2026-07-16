@@ -162,6 +162,7 @@ export function ChatApp({
         role: "user",
         content: message,
         reasoning_content: null,
+        tool_activity: [],
         model_preset: null,
         status: "completed",
         duration_ms: null,
@@ -173,6 +174,7 @@ export function ChatApp({
         role: "assistant",
         content: "",
         reasoning_content: "",
+        tool_activity: [],
         model_preset: preset,
         status: "streaming",
         duration_ms: null,
@@ -187,6 +189,7 @@ export function ChatApp({
       assistantId: tempAssistantId,
       content: "",
       reasoning: "",
+      activities: [],
       startedAt: Date.now(),
     };
 

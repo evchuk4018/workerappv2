@@ -1,9 +1,12 @@
-import { buildDeepSeekModelOptions, isModelPreset } from "@/lib/models";
-import { encodeStreamEvent, parseDeepSeekSseBlock } from "@/lib/streaming";
+import { runDeepSeekAgent } from "@/lib/deepseek/agent";
+import { isModelPreset } from "@/lib/models";
+import { encodeStreamEvent } from "@/lib/streaming";
 import { getAllowedUser } from "@/lib/supabase/auth-user";
 import { buildProviderMessages } from "@/lib/system-prompt";
 import { titleFromMessage } from "@/lib/title";
 import { finalizeConversationTitle } from "@/lib/title-finalization";
+import { type ToolActivity, upsertToolActivity } from "@/lib/tool-activity";
+import { parseApiKeys } from "@/lib/web/key-failover";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -104,18 +107,22 @@ export async function POST(request: Request) {
   }
 
   const deepSeekKey = process.env.DEEPSEEK_API_KEY;
+  const braveKeys = parseApiKeys(process.env.BRAVE_SEARCH_API_KEYS);
+  const tavilyKeys = parseApiKeys(process.env.TAVILY_API_KEYS);
   const encoder = new TextEncoder();
   const startedAt = Date.now();
   const stableConversationId = conversationId;
   const preset = body.preset;
+  const upstreamController = new AbortController();
+  const abortUpstream = () => upstreamController.abort();
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       let content = "";
       let reasoning = "";
+      let activities: ToolActivity[] = [];
+      let activityWrites = Promise.resolve();
       let outputOpen = true;
-      const upstreamController = new AbortController();
-      const abortUpstream = () => upstreamController.abort();
       request.signal.addEventListener("abort", abortUpstream, { once: true });
       if (request.signal.aborted) upstreamController.abort();
 
@@ -159,75 +166,52 @@ export async function POST(request: Request) {
         }
 
         try {
-          const modelOptions = buildDeepSeekModelOptions(preset);
-          const upstream = await fetch("https://api.deepseek.com/chat/completions", {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${deepSeekKey}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              ...modelOptions,
-              messages: buildProviderMessages(
-                [...(history ?? []), { role: "user", content: message }],
-                systemPrompt,
-              ),
-              stream: true,
-              max_tokens: 8192,
-            }),
+          const result = await runDeepSeekAgent({
+            apiKey: deepSeekKey,
+            preset,
+            messages: buildProviderMessages(
+              [...(history ?? []), { role: "user", content: message }],
+              systemPrompt,
+            ),
+            braveKeys,
+            tavilyKeys,
             signal: upstreamController.signal,
+            onReasoning(delta) {
+              reasoning += delta;
+              send({ type: "reasoning_delta", delta });
+            },
+            onContent(delta) {
+              content += delta;
+              send({ type: "content_delta", delta });
+            },
+            onActivity(activity) {
+              activities = upsertToolActivity(activities, activity);
+              send({ type: "tool_activity", activity });
+              if (activity.status === "running") return;
+              const snapshot = activities;
+              activityWrites = activityWrites.then(async () => {
+                await supabase
+                  .from("messages")
+                  .update({ tool_activity: snapshot })
+                  .eq("id", assistantMessage.id)
+                  .eq("status", "streaming");
+              });
+            },
           });
-
-          if (!upstream.ok || !upstream.body) {
-            throw new Error(`DeepSeek returned ${upstream.status}.`);
-          }
-
-          const reader = upstream.body.getReader();
-          const decoder = new TextDecoder();
-          let buffer = "";
-          let finished = false;
-
-          while (!finished) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            const blocks = buffer.split(/\r?\n\r?\n/);
-            buffer = blocks.pop() ?? "";
-
-            for (const block of blocks) {
-              const delta = parseDeepSeekSseBlock(block);
-              if (!delta) continue;
-              if (delta.reasoning) {
-                reasoning += delta.reasoning;
-                send({ type: "reasoning_delta", delta: delta.reasoning });
-              }
-              if (delta.content) {
-                content += delta.content;
-                send({ type: "content_delta", delta: delta.content });
-              }
-              if (delta.done) {
-                finished = true;
-                break;
-              }
-            }
-          }
-
-          if (!finished && buffer.trim()) {
-            const delta = parseDeepSeekSseBlock(buffer);
-            if (delta?.reasoning) {
-              reasoning += delta.reasoning;
-              send({ type: "reasoning_delta", delta: delta.reasoning });
-            }
-            if (delta?.content) {
-              content += delta.content;
-              send({ type: "content_delta", delta: delta.content });
-            }
-          }
+          content = result.content;
+          reasoning = result.reasoning;
+          await activityWrites;
 
           const durationMs = Date.now() - startedAt;
           await supabase
             .from("messages")
-            .update({ content, reasoning_content: reasoning, status: "completed", duration_ms: durationMs })
+            .update({
+              content,
+              reasoning_content: reasoning,
+              tool_activity: activities,
+              status: "completed",
+              duration_ms: durationMs,
+            })
             .eq("id", assistantMessage.id)
             .eq("status", "streaming");
           if (!titleFinalizedAt) {
@@ -254,11 +238,13 @@ export async function POST(request: Request) {
         } catch (caught) {
           const durationMs = Date.now() - startedAt;
           const stopped = upstreamController.signal.aborted || request.signal.aborted;
+          await activityWrites;
           await supabase
             .from("messages")
             .update({
               content,
               reasoning_content: reasoning,
+              tool_activity: activities,
               status: stopped ? "stopped" : "error",
               duration_ms: durationMs,
             })
@@ -280,7 +266,7 @@ export async function POST(request: Request) {
       })();
     },
     cancel() {
-      // Client cancellation propagates through request.signal in supported runtimes.
+      upstreamController.abort();
     },
   });
 

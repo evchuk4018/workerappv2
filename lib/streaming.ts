@@ -1,3 +1,5 @@
+import type { ToolActivity } from "@/lib/tool-activity";
+
 export type StreamEvent =
   | {
       type: "meta";
@@ -8,6 +10,7 @@ export type StreamEvent =
     }
   | { type: "reasoning_delta"; delta: string }
   | { type: "content_delta"; delta: string }
+  | { type: "tool_activity"; activity: ToolActivity }
   | { type: "title"; conversationId: string; title: string }
   | { type: "done"; durationMs: number; status: "completed" | "stopped" }
   | { type: "error"; message: string };
@@ -32,6 +35,13 @@ export function parseNdjsonBuffer(buffer: string) {
 export interface DeepSeekDelta {
   reasoning: string;
   content: string;
+  toolCalls: Array<{
+    index: number;
+    id: string;
+    name: string;
+    arguments: string;
+  }>;
+  finishReason: string | null;
   done: boolean;
 }
 
@@ -44,19 +54,36 @@ export function parseDeepSeekSseBlock(block: string): DeepSeekDelta | null {
 
   if (!data) return null;
   if (data.trim() === "[DONE]") {
-    return { reasoning: "", content: "", done: true };
+    return { reasoning: "", content: "", toolCalls: [], finishReason: null, done: true };
   }
 
   const parsed = JSON.parse(data) as {
     choices?: Array<{
-      delta?: { reasoning_content?: string | null; content?: string | null };
+      delta?: {
+        reasoning_content?: string | null;
+        content?: string | null;
+        tool_calls?: Array<{
+          index?: number;
+          id?: string;
+          function?: { name?: string; arguments?: string };
+        }>;
+      };
+      finish_reason?: string | null;
     }>;
   };
-  const delta = parsed.choices?.[0]?.delta;
+  const choice = parsed.choices?.[0];
+  const delta = choice?.delta;
 
   return {
     reasoning: delta?.reasoning_content ?? "",
     content: delta?.content ?? "",
+    toolCalls: (delta?.tool_calls ?? []).map((call) => ({
+      index: call.index ?? 0,
+      id: call.id ?? "",
+      name: call.function?.name ?? "",
+      arguments: call.function?.arguments ?? "",
+    })),
+    finishReason: choice?.finish_reason ?? null,
     done: false,
   };
 }

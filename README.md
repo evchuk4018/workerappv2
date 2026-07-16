@@ -4,7 +4,7 @@ A focused, single-user DeepSeek V4 chat application built with Next.js and Supab
 
 ## Setup
 
-1. Copy `.env.example` to `.env.local` and fill in the Supabase and DeepSeek values.
+1. Copy `.env.example` to `.env.local` and fill in the Supabase, DeepSeek, Brave Search, and Tavily values. Multiple Brave or Tavily keys may be provided as comma-separated ordered fallbacks.
 2. Create `erholovachuk@gmail.com` in Supabase Authentication and disable public sign-ups.
 3. Add `http://localhost:3000/auth/callback` and the production equivalent to the Supabase redirect allow list.
 4. Run `npm install` to install the app and the pinned Supabase CLI.

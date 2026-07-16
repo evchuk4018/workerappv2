@@ -140,6 +140,25 @@
 .settings-discard span { color: #9a8f8f; font-size: 11px; }
 .settings-discard .danger-button { border-color: #8d4e53; background: #6b343a; color: #fff; }
 .settings-discard .danger-button:hover { background: #7c3c43; }
+.brave-attribution {
+  width: fit-content;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 18px auto 0;
+  color: #7f7f84;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+.brave-attribution:hover { color: #b7b7bb; }
+.brave-attribution-mark {
+  width: 14px;
+  height: 16px;
+  background: center / contain no-repeat url("/brave-logo.svg");
+}
 
 @keyframes settings-spin { to { transform: rotate(360deg); } }
 

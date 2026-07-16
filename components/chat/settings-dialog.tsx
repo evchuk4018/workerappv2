@@ -231,6 +231,17 @@ export function SettingsDialog({ onClose, returnFocusRef }: SettingsDialogProps)
             )}
           </>
         )}
+
+        <a
+          className="brave-attribution"
+          href="https://brave.com/search/api/"
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Powered by Brave Search API"
+        >
+          <span className="brave-attribution-mark" aria-hidden="true" />
+          <span>Powered by Brave</span>
+        </a>
       </section>
     </div>
   );

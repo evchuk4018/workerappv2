@@ -1,3 +1,5 @@
+import type { ToolActivity } from "@/lib/tool-activity";
+
 export type Json =
   | string
   | number
@@ -59,6 +61,7 @@ export interface Database {
           role: "user" | "assistant";
           content: string;
           reasoning_content: string | null;
+          tool_activity: ToolActivity[];
           model_preset: "high" | "medium" | "low" | "flash" | null;
           status: "streaming" | "completed" | "stopped" | "error";
           duration_ms: number | null;
@@ -70,6 +73,7 @@ export interface Database {
           role: "user" | "assistant";
           content?: string;
           reasoning_content?: string | null;
+          tool_activity?: ToolActivity[];
           model_preset?: "high" | "medium" | "low" | "flash" | null;
           status?: "streaming" | "completed" | "stopped" | "error";
           duration_ms?: number | null;
@@ -78,6 +82,7 @@ export interface Database {
         Update: {
           content?: string;
           reasoning_content?: string | null;
+          tool_activity?: ToolActivity[];
           status?: "streaming" | "completed" | "stopped" | "error";
           duration_ms?: number | null;
         };

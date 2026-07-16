@@ -53,6 +53,15 @@ describe("stop response route", () => {
         body: JSON.stringify({
           content: "A partial explanation",
           reasoning: "Partial reasoning",
+          toolActivity: [{
+            id: "search-1",
+            kind: "search",
+            provider: "brave",
+            status: "running",
+            query: "streaming",
+            sources: [],
+            started_at: "2026-07-16T00:00:00.000Z",
+          }],
           durationMs: 123.4,
         }),
       }),
@@ -64,6 +73,11 @@ describe("stop response route", () => {
     expect(stoppedUpdate.update).toHaveBeenCalledWith({
       content: "A partial explanation",
       reasoning_content: "Partial reasoning",
+      tool_activity: [expect.objectContaining({
+        id: "search-1",
+        status: "error",
+        error: "Stopped before this tool completed.",
+      })],
       duration_ms: 123,
       status: "stopped",
     });

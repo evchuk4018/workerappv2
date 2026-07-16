@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAllowedUser } from "@/lib/supabase/auth-user";
+import { normalizeToolActivities } from "@/lib/tool-activity";
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
   const auth = await getAllowedUser();
@@ -14,12 +15,18 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       .maybeSingle(),
     auth.supabase
       .from("messages")
-      .select("id,conversation_id,role,content,reasoning_content,model_preset,status,duration_ms,created_at")
+      .select("id,conversation_id,role,content,reasoning_content,tool_activity,model_preset,status,duration_ms,created_at")
       .eq("conversation_id", id)
       .order("created_at", { ascending: true }),
   ]);
 
   if (!conversation) return NextResponse.json({ error: "Chat not found." }, { status: 404 });
   if (error) return NextResponse.json({ error: "Unable to load messages." }, { status: 500 });
-  return NextResponse.json({ conversation, messages });
+  return NextResponse.json({
+    conversation,
+    messages: messages?.map((item) => ({
+      ...item,
+      tool_activity: normalizeToolActivities(item.tool_activity),
+    })) ?? [],
+  });
 }

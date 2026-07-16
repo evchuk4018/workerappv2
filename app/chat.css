@@ -138,6 +138,39 @@
 .thinking-block.is-open .thinking-chevron { transform: rotate(180deg); }
 .thinking-pulse { width: 6px; height: 6px; border-radius: 50%; background: #929cff; animation: pulse 1.15s ease-in-out infinite; }
 .thinking-content { margin: 10px 0 0 7px; padding: 4px 8px 4px 17px; border-left: 1px solid #3d3d3d; color: #aaa; font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
+.tool-activity-list { display: grid; gap: 7px; margin: -5px 0 17px; }
+.tool-activity {
+  overflow: hidden;
+  border: 1px solid #303035;
+  border-radius: 11px;
+  background: #151517;
+  color: #aaa;
+  font-size: 12.5px;
+}
+.tool-activity summary {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 11px;
+  cursor: pointer;
+  list-style: none;
+}
+.tool-activity summary::-webkit-details-marker { display: none; }
+.tool-activity summary > span { min-width: 0; overflow: hidden; color: #c8c8ca; text-overflow: ellipsis; white-space: nowrap; }
+.tool-activity summary > svg:first-child { flex: none; color: #929cff; }
+.tool-activity.tool-error summary > svg:first-child, .tool-error { color: #ff9b9b; }
+.tool-chevron { flex: none; margin-left: auto; transition: transform .18s ease; }
+.tool-activity[open] .tool-chevron { transform: rotate(180deg); }
+.tool-spinner { flex: none; animation: settings-spin .8s linear infinite; }
+.tool-activity-detail { padding: 2px 12px 12px 35px; border-top: 1px solid #29292d; }
+.tool-activity-detail > p { margin: 10px 0 0; overflow-wrap: anywhere; }
+.tool-activity-detail ol { display: grid; gap: 12px; margin: 11px 0 0; padding-left: 18px; }
+.tool-activity-detail li { padding-left: 3px; }
+.tool-activity-detail a { color: #b5bdff; text-underline-offset: 2px; }
+.tool-activity-detail small { display: block; margin-top: 2px; color: #707075; }
+.tool-activity-detail li p { margin: 4px 0 0; color: #98989c; line-height: 1.45; }
+.tool-mode { display: inline-block; margin-left: 8px; color: #77777c; font-size: 11px; }
 .typing-dots, .loading-chat { display: flex; align-items: center; gap: 5px; height: 28px; }
 .typing-dots i, .loading-chat span { width: 5px; height: 5px; border-radius: 50%; background: #888; animation: bounce 1.2s infinite; }
 .typing-dots i:nth-child(2), .loading-chat span:nth-child(2) { animation-delay: .14s; }

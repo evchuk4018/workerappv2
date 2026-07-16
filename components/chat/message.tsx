@@ -7,6 +7,7 @@ import { AlertCircle } from "lucide-react";
 import type { ComponentPropsWithoutRef } from "react";
 import type { ChatMessage } from "@/lib/types";
 import { ThinkingBlock } from "./thinking-block";
+import { ToolActivityList } from "./tool-activity-list";
 
 function LinkedImage({ src, alt }: ComponentPropsWithoutRef<"img">) {
   if (typeof src !== "string" || !src) {
@@ -31,6 +32,7 @@ export function Message({ message }: { message: ChatMessage }) {
         status={message.status}
         durationMs={message.duration_ms}
       />
+      <ToolActivityList activities={message.tool_activity} />
       {message.content ? (
         <div className="markdown-body">
           <Markdown

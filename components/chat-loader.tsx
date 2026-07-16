@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { ChatApp } from "@/components/chat/chat-app";
 import { getAllowedUser } from "@/lib/supabase/auth-user";
+import { normalizeToolActivities } from "@/lib/tool-activity";
 
 export async function ChatLoader({ conversationId }: { conversationId?: string }) {
   const auth = await getAllowedUser();
@@ -26,10 +27,13 @@ export async function ChatLoader({ conversationId }: { conversationId?: string }
       validConversationId = conversation.id;
       const { data } = await auth.supabase
         .from("messages")
-        .select("id,conversation_id,role,content,reasoning_content,model_preset,status,duration_ms,created_at")
+        .select("id,conversation_id,role,content,reasoning_content,tool_activity,model_preset,status,duration_ms,created_at")
         .eq("conversation_id", conversation.id)
         .order("created_at", { ascending: true });
-      messages = data;
+      messages = data?.map((item) => ({
+        ...item,
+        tool_activity: normalizeToolActivities(item.tool_activity),
+      })) ?? null;
     }
   }
 

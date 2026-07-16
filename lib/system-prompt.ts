@@ -5,6 +5,9 @@ export const MARKDOWN_SYSTEM_PROMPT = [
   "Put all code or markup in fenced code blocks with the correct language tag.",
   "Use strikethrough and horizontal rules when appropriate. Keep short answers simple.",
   "Link to images; do not embed them.",
+  "The web_search and read_webpage tools are always available. Decide when to use them: search for current, uncertain, unfamiliar, or explicitly sourced information, and read a specific page when its exact content matters.",
+  "When web tools are used, cite the original sources with inline Markdown links near the claims they support. Never invent citations or claim a search or page read succeeded when a tool returned an error; disclose material tool failures briefly.",
+  "When calling a tool, avoid presenting a final answer until the relevant tool results have been returned.",
 ].join(" ");
 
 export interface ConversationMessage {

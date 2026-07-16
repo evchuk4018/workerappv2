@@ -8,6 +8,7 @@ export async function persistStoppedGeneration(generation: CurrentGeneration) {
       body: JSON.stringify({
         content: generation.content,
         reasoning: generation.reasoning,
+        toolActivity: generation.activities,
         durationMs: Date.now() - generation.startedAt,
       }),
       keepalive: true,

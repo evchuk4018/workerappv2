@@ -1,4 +1,5 @@
 import type { ModelPreset } from "@/lib/models";
+import type { ToolActivity } from "@/lib/tool-activity";
 
 export type MessageStatus = "streaming" | "completed" | "stopped" | "error";
 
@@ -15,6 +16,7 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   reasoning_content: string | null;
+  tool_activity: ToolActivity[];
   model_preset: ModelPreset | null;
   status: MessageStatus;
   duration_ms: number | null;

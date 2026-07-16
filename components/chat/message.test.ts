@@ -11,6 +11,7 @@ function renderAssistant(content: string): string {
     role: "assistant",
     content,
     reasoning_content: null,
+    tool_activity: [],
     model_preset: null,
     status: "completed",
     duration_ms: 100,

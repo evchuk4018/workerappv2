@@ -1,12 +1,14 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { StreamEvent } from "@/lib/streaming";
 import type { ChatMessage, ConversationSummary } from "@/lib/types";
+import { type ToolActivity, upsertToolActivity } from "@/lib/tool-activity";
 
 export interface CurrentGeneration {
   controller: AbortController;
   assistantId: string;
   content: string;
   reasoning: string;
+  activities: ToolActivity[];
   startedAt: number;
 }
 
@@ -98,6 +100,19 @@ export function applyStreamEvent(
     if (context.generationRef.current) context.generationRef.current.content += event.delta;
     context.setMessages((current) => current.map((item) => item.id === ids.assistant
       ? { ...item, content: `${item.content}${event.delta}` }
+      : item));
+    return;
+  }
+
+  if (event.type === "tool_activity") {
+    if (context.generationRef.current) {
+      context.generationRef.current.activities = upsertToolActivity(
+        context.generationRef.current.activities,
+        event.activity,
+      );
+    }
+    context.setMessages((current) => current.map((item) => item.id === ids.assistant
+      ? { ...item, tool_activity: upsertToolActivity(item.tool_activity, event.activity) }
       : item));
     return;
   }

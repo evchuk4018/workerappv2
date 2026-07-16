@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { getAllowedUser } from "@/lib/supabase/auth-user";
 import { finalizeConversationTitle } from "@/lib/title-finalization";
+import { normalizeToolActivities } from "@/lib/tool-activity";
 
 interface StopBody {
   content?: unknown;
   reasoning?: unknown;
   durationMs?: unknown;
+  toolActivity?: unknown;
 }
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -25,6 +27,14 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const durationMs = typeof body.durationMs === "number" && body.durationMs >= 0
     ? Math.round(body.durationMs)
     : null;
+  const toolActivity = normalizeToolActivities(body.toolActivity).map((activity) => activity.status === "running"
+    ? {
+        ...activity,
+        status: "error" as const,
+        error: "Stopped before this tool completed.",
+        completed_at: new Date().toISOString(),
+      }
+    : activity);
 
   const { data: assistant } = await auth.supabase
     .from("messages")
@@ -36,7 +46,13 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
   const { error } = await auth.supabase
     .from("messages")
-    .update({ content, reasoning_content: reasoning, duration_ms: durationMs, status: "stopped" })
+    .update({
+      content,
+      reasoning_content: reasoning,
+      tool_activity: toolActivity,
+      duration_ms: durationMs,
+      status: "stopped",
+    })
     .eq("id", id)
     .eq("role", "assistant")
     .eq("status", "streaming");
