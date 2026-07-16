@@ -1,5 +1,11 @@
 export const MAX_SYSTEM_PROMPT_LENGTH = 20_000;
-export const SYSTEM_PROMPT_INTERVAL = 5;
+export const MARKDOWN_SYSTEM_PROMPT = [
+  "You can use CommonMark, GitHub-Flavored Markdown, and KaTeX math.",
+  "Use formatting when it improves clarity: **bold** for key points, *italics* for nuance, headings for longer sections, lists for items or steps, task lists for checklists, tables for compact comparisons, blockquotes for quotations, links for references, `inline code` for identifiers, footnotes for asides, and `$...$` or `$$...$$` for math.",
+  "Put all code or markup in fenced code blocks with the correct language tag.",
+  "Use strikethrough and horizontal rules when appropriate. Keep short answers simple.",
+  "Link to images; do not embed them.",
+].join(" ");
 
 export interface ConversationMessage {
   role: "user" | "assistant";
@@ -22,21 +28,13 @@ export function buildProviderMessages(
   messages: readonly ConversationMessage[],
   systemPrompt: string,
 ): ProviderMessage[] {
-  const prompt = systemPrompt.trim() ? systemPrompt : "";
-  if (!prompt) return messages.map((message) => ({ ...message }));
+  const customPrompt = systemPrompt.trim() ? systemPrompt : "";
+  const prompt = customPrompt
+    ? `${MARKDOWN_SYSTEM_PROMPT}\n\n${customPrompt}`
+    : MARKDOWN_SYSTEM_PROMPT;
 
-  const result: ProviderMessage[] = [];
-  let userTurns = 0;
-
-  for (const message of messages) {
-    if (message.role === "user") {
-      if (userTurns % SYSTEM_PROMPT_INTERVAL === 0) {
-        result.push({ role: "system", content: prompt });
-      }
-      userTurns += 1;
-    }
-    result.push({ ...message });
-  }
-
-  return result;
+  return [
+    { role: "system", content: prompt },
+    ...messages.map((message) => ({ ...message })),
+  ];
 }

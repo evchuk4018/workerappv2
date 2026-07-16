@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildProviderMessages,
+  MARKDOWN_SYSTEM_PROMPT,
   MAX_SYSTEM_PROMPT_LENGTH,
   normalizeSystemPrompt,
 } from "./system-prompt";
@@ -22,38 +23,35 @@ describe("system prompt settings", () => {
 });
 
 describe("system prompt injection", () => {
-  it("does not add messages when the prompt is blank", () => {
+  it("always adds the built-in prompt first when the custom prompt is blank", () => {
     const history = [{ role: "user" as const, content: "Hello" }];
-    expect(buildProviderMessages(history, " \n")).toEqual(history);
+    expect(buildProviderMessages(history, " \n")).toEqual([
+      { role: "system", content: MARKDOWN_SYSTEM_PROMPT },
+      ...history,
+    ]);
   });
 
-  it("injects before user turns 1, 6, and 11", () => {
-    const history = Array.from({ length: 11 }, (_, index) => [
-      { role: "user" as const, content: `user-${index + 1}` },
-      { role: "assistant" as const, content: `assistant-${index + 1}` },
-    ]).flat();
-
-    const result = buildProviderMessages(history, "Be concise");
-    expect(result
-      .map((message, index) => ({ message, next: result[index + 1] }))
-      .filter(({ message }) => message.role === "system")
-      .map(({ next }) => next.content))
-      .toEqual(["user-1", "user-6", "user-11"]);
+  it("places the saved custom prompt after the built-in guidance", () => {
+    const result = buildProviderMessages([], "  Keep this spacing\n");
+    expect(result).toEqual([
+      {
+        role: "system",
+        content: `${MARKDOWN_SYSTEM_PROMPT}\n\n  Keep this spacing\n`,
+      },
+    ]);
   });
 
-  it("counts only user turns and preserves consecutive-message order", () => {
+  it("adds exactly one system message and preserves conversation order", () => {
     const history = [
       { role: "assistant" as const, content: "stopped output" },
-      ...Array.from({ length: 6 }, (_, index) => ({
+      ...Array.from({ length: 11 }, (_, index) => ({
         role: "user" as const,
         content: `user-${index + 1}`,
       })),
     ];
 
     const result = buildProviderMessages(history, "Prompt");
-    expect(result.filter((message) => message.role !== "system")).toEqual(history);
-    expect(result.filter((message) => message.role === "system")).toHaveLength(2);
-    expect(result.at(-2)).toEqual({ role: "system", content: "Prompt" });
-    expect(result.at(-1)).toEqual({ role: "user", content: "user-6" });
+    expect(result.filter((message) => message.role === "system")).toHaveLength(1);
+    expect(result.slice(1)).toEqual(history);
   });
 });

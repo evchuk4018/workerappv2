@@ -1,8 +1,19 @@
 import Markdown from "react-markdown";
+import rehypeHighlight from "rehype-highlight";
+import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 import { AlertCircle } from "lucide-react";
+import type { ComponentPropsWithoutRef } from "react";
 import type { ChatMessage } from "@/lib/types";
 import { ThinkingBlock } from "./thinking-block";
+
+function LinkedImage({ src, alt }: ComponentPropsWithoutRef<"img">) {
+  if (typeof src !== "string" || !src) {
+    return <span>{alt?.trim() || "Image unavailable"}</span>;
+  }
+  return <a href={src}>{alt?.trim() || "Image link"}</a>;
+}
 
 export function Message({ message }: { message: ChatMessage }) {
   if (message.role === "user") {
@@ -22,7 +33,17 @@ export function Message({ message }: { message: ChatMessage }) {
       />
       {message.content ? (
         <div className="markdown-body">
-          <Markdown remarkPlugins={[remarkGfm]}>{message.content}</Markdown>
+          <Markdown
+            components={{ img: LinkedImage }}
+            rehypePlugins={[
+              [rehypeKatex, { errorColor: "#ff8585", strict: "ignore", trust: false }],
+              [rehypeHighlight, { detect: false }],
+            ]}
+            remarkPlugins={[remarkGfm, remarkMath]}
+            skipHtml
+          >
+            {message.content}
+          </Markdown>
         </div>
       ) : message.status === "streaming" && !message.reasoning_content ? (
         <div className="typing-dots" aria-label="DeepSeek is responding"><i /><i /><i /></div>
