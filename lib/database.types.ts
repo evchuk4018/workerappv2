@@ -14,6 +14,7 @@ export interface Database {
           id: string;
           user_id: string;
           title: string;
+          system_prompt: string;
           created_at: string;
           updated_at: string;
         };
@@ -21,11 +22,29 @@ export interface Database {
           id?: string;
           user_id: string;
           title: string;
+          system_prompt?: string;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           title?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      user_settings: {
+        Row: {
+          user_id: string;
+          system_prompt: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          system_prompt?: string;
+          updated_at?: string;
+        };
+        Update: {
+          system_prompt?: string;
           updated_at?: string;
         };
         Relationships: [];

@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./chat.css";
+import "./controls.css";
+import "./settings.css";
+import "./responsive.css";
 
 export const metadata: Metadata = {
   title: "DeepSeek Chat",

@@ -1,6 +1,7 @@
 import { buildDeepSeekModelOptions, isModelPreset } from "@/lib/models";
 import { encodeStreamEvent, parseDeepSeekSseBlock } from "@/lib/streaming";
 import { getAllowedUser } from "@/lib/supabase/auth-user";
+import { buildProviderMessages } from "@/lib/system-prompt";
 import { titleFromMessage } from "@/lib/title";
 
 export const runtime = "nodejs";
@@ -31,19 +32,31 @@ export async function POST(request: Request) {
   const supabase = auth.supabase;
   let conversationId = body.conversationId ?? null;
   let title = titleFromMessage(message);
+  let systemPrompt = "";
 
   if (conversationId) {
     const { data: existing } = await supabase
       .from("conversations")
-      .select("id,title")
+      .select("id,title,system_prompt")
       .eq("id", conversationId)
       .maybeSingle();
     if (!existing) return Response.json({ error: "Chat not found." }, { status: 404 });
     title = existing.title;
+    systemPrompt = existing.system_prompt;
   } else {
+    const { data: settings, error: settingsError } = await supabase
+      .from("user_settings")
+      .select("system_prompt")
+      .eq("user_id", auth.user.id)
+      .maybeSingle();
+    if (settingsError) {
+      return Response.json({ error: "Unable to load settings." }, { status: 500 });
+    }
+    systemPrompt = settings?.system_prompt ?? "";
+
     const { data: created, error } = await supabase
       .from("conversations")
-      .insert({ user_id: auth.user.id, title })
+      .insert({ user_id: auth.user.id, title, system_prompt: systemPrompt })
       .select("id,title")
       .single();
     if (error || !created) {
@@ -151,7 +164,10 @@ export async function POST(request: Request) {
             },
             body: JSON.stringify({
               ...modelOptions,
-              messages: [...(history ?? []), { role: "user", content: message }],
+              messages: buildProviderMessages(
+                [...(history ?? []), { role: "user", content: message }],
+                systemPrompt,
+              ),
               stream: true,
               max_tokens: 8192,
             }),

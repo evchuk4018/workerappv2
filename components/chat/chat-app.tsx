@@ -1,29 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import {
-  ArrowUp,
-  Menu,
-  MessageSquare,
-  Search,
-  Sparkles,
-  Square,
-  SquarePen,
-  X,
-} from "lucide-react";
-import { Message } from "@/components/chat/message";
-import { ModelMenu } from "@/components/chat/model-menu";
+import { ChatPanel } from "@/components/chat/chat-panel";
+import { ChatSidebar } from "@/components/chat/chat-sidebar";
+import { SearchDialog } from "@/components/chat/search-dialog";
+import { SettingsDialog } from "@/components/chat/settings-dialog";
+import { applyStreamEvent, type CurrentGeneration } from "@/components/chat/stream-event";
+import { useConversationSearch } from "@/components/chat/use-conversation-search";
 import { type ModelPreset } from "@/lib/models";
 import { parseNdjsonBuffer, type StreamEvent } from "@/lib/streaming";
 import type { ChatMessage, ConversationSummary } from "@/lib/types";
-
-interface CurrentGeneration {
-  controller: AbortController;
-  assistantId: string;
-  content: string;
-  reasoning: string;
-  startedAt: number;
-}
 
 export function ChatApp({
   initialConversations,
@@ -43,12 +29,13 @@ export function ChatApp({
   const [loadingChat, setLoadingChat] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState(initialConversations);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [error, setError] = useState("");
+  const search = useConversationSearch(searchOpen, initialConversations);
   const generationRef = useRef<CurrentGeneration | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const settingsButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const stored = window.localStorage.getItem("deepseek-model-preset") as ModelPreset | null;
@@ -66,27 +53,6 @@ export function ChatApp({
     const frame = requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ block: "end" }));
     return () => cancelAnimationFrame(frame);
   }, [messages]);
-
-  useEffect(() => {
-    if (!textareaRef.current) return;
-    textareaRef.current.style.height = "0px";
-    textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 180)}px`;
-  }, [input]);
-
-  useEffect(() => {
-    if (!searchOpen) return;
-    const timeout = window.setTimeout(async () => {
-      try {
-        const response = await fetch(`/api/conversations?query=${encodeURIComponent(searchQuery)}`);
-        if (!response.ok) return;
-        const data = (await response.json()) as { conversations: ConversationSummary[] };
-        setSearchResults(data.conversations);
-      } catch {
-        // Keep the previous results if search is temporarily unavailable.
-      }
-    }, 180);
-    return () => window.clearTimeout(timeout);
-  }, [searchOpen, searchQuery]);
 
   async function refreshConversations() {
     try {
@@ -162,62 +128,13 @@ export function ChatApp({
     ids: { user: string; assistant: string },
     requestConversationId: string | null,
   ) {
-    if (event.type === "meta") {
-      const previousUserId = ids.user;
-      const previousAssistantId = ids.assistant;
-      ids.user = event.userMessageId;
-      ids.assistant = event.assistantMessageId;
-      if (generationRef.current) generationRef.current.assistantId = event.assistantMessageId;
-
-      setMessages((current) => current.map((item) => {
-        if (item.id === previousUserId) {
-          return { ...item, id: event.userMessageId, conversation_id: event.conversationId };
-        }
-        if (item.id === previousAssistantId) {
-          return { ...item, id: event.assistantMessageId, conversation_id: event.conversationId };
-        }
-        return item;
-      }));
-      setActiveConversationId(event.conversationId);
-      const now = new Date().toISOString();
-      setConversations((current) => [
-        {
-          id: event.conversationId,
-          title: event.title,
-          created_at: now,
-          updated_at: now,
-        },
-        ...current.filter((item) => item.id !== event.conversationId),
-      ]);
-      if (!requestConversationId) {
-        window.history.replaceState({ conversationId: event.conversationId }, "", `/c/${event.conversationId}`);
-      }
-      return;
-    }
-
-    if (event.type === "reasoning_delta") {
-      if (generationRef.current) generationRef.current.reasoning += event.delta;
-      setMessages((current) => current.map((item) => item.id === ids.assistant
-        ? { ...item, reasoning_content: `${item.reasoning_content ?? ""}${event.delta}` }
-        : item));
-      return;
-    }
-
-    if (event.type === "content_delta") {
-      if (generationRef.current) generationRef.current.content += event.delta;
-      setMessages((current) => current.map((item) => item.id === ids.assistant
-        ? { ...item, content: `${item.content}${event.delta}` }
-        : item));
-      return;
-    }
-
-    if (event.type === "done") {
-      updateMessage(ids.assistant, { status: event.status, duration_ms: event.durationMs });
-      return;
-    }
-
-    setError(event.message);
-    updateMessage(ids.assistant, { status: "error" });
+    applyStreamEvent(event, ids, requestConversationId, {
+      generationRef,
+      setMessages,
+      setActiveConversationId,
+      setConversations,
+      setError,
+    });
   }
 
   async function sendMessage() {
@@ -284,7 +201,6 @@ export function ChatApp({
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -293,7 +209,6 @@ export function ChatApp({
         buffer = parsed.remainder;
         parsed.events.forEach((event) => handleStreamEvent(event, ids, requestConversationId));
       }
-
       if (buffer.trim()) {
         handleStreamEvent(JSON.parse(buffer) as StreamEvent, ids, requestConversationId);
       }
@@ -334,110 +249,50 @@ export function ChatApp({
     }
   }
 
-  function handleComposerKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      void sendMessage();
-    }
-  }
-
   return (
     <main className="app-shell">
-      <aside className={`sidebar${sidebarOpen ? " is-open" : ""}`}>
-        <div className="sidebar-header">
-          <button className="brand" type="button" onClick={newChat} disabled={isStreaming}>
-            <span className="brand-mark"><Sparkles size={16} /></span>
-            <span>DeepSeek <em>Chat</em></span>
-          </button>
-          <button className="mobile-close" type="button" onClick={() => setSidebarOpen(false)} aria-label="Close sidebar"><X size={20} /></button>
-        </div>
-        <nav className="sidebar-actions" aria-label="Chat navigation">
-          <button type="button" onClick={newChat} disabled={isStreaming}><SquarePen size={18} /><span>New chat</span></button>
-          <button type="button" onClick={() => { setSearchOpen(true); setSidebarOpen(false); }} disabled={isStreaming}><Search size={18} /><span>Search chats</span></button>
-        </nav>
-        <div className="recent-heading">Recent</div>
-        <div className="conversation-list">
-          {conversations.length ? conversations.map((conversation) => (
-            <button
-              type="button"
-              key={conversation.id}
-              className={conversation.id === activeConversationId ? "active" : ""}
-              onClick={() => void openConversation(conversation.id)}
-              disabled={isStreaming}
-              title={conversation.title}
-            >
-              {conversation.title}
-            </button>
-          )) : <p className="empty-recents">Your chats will appear here.</p>}
-        </div>
-      </aside>
-
-      {sidebarOpen && <button className="sidebar-scrim" type="button" aria-label="Close sidebar" onClick={() => setSidebarOpen(false)} />}
-
-      <section className="chat-panel">
-        <header className="mobile-header">
-          <button type="button" onClick={() => setSidebarOpen(true)} aria-label="Open sidebar"><Menu size={21} /></button>
-          <span><Sparkles size={15} /> DeepSeek Chat</span>
-          <div aria-hidden="true" />
-        </header>
-
-        <div className="messages-scroll">
-          {loadingChat ? (
-            <div className="loading-chat"><span /><span /><span /></div>
-          ) : messages.length ? (
-            <div className="messages-column">
-              {messages.map((message) => <Message key={message.id} message={message} />)}
-              <div ref={bottomRef} />
-            </div>
-          ) : (
-            <div className="empty-chat">
-              <div className="empty-mark"><Sparkles size={25} /></div>
-              <h1>What can I help you think through?</h1>
-              <p>Choose a thinking level and start a conversation with DeepSeek V4.</p>
-            </div>
-          )}
-        </div>
-
-        <div className="composer-dock">
-          {error && <div className="error-banner" role="alert">{error}<button type="button" onClick={() => setError("")} aria-label="Dismiss"><X size={15} /></button></div>}
-          <div className="composer">
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              onKeyDown={handleComposerKeyDown}
-              placeholder="Message DeepSeek"
-              rows={1}
-              disabled={isStreaming}
-              aria-label="Message DeepSeek"
-            />
-            <div className="composer-toolbar">
-              <ModelMenu value={preset} onChange={setPreset} disabled={isStreaming} />
-              {isStreaming ? (
-                <button className="send-button stop-button" type="button" onClick={stopOutput} aria-label="Stop response"><Square size={14} fill="currentColor" /></button>
-              ) : (
-                <button className="send-button" type="button" onClick={() => void sendMessage()} disabled={!input.trim()} aria-label="Send message"><ArrowUp size={19} strokeWidth={2.4} /></button>
-              )}
-            </div>
-          </div>
-          <p className="composer-note">DeepSeek can make mistakes. Check important information.</p>
-        </div>
-      </section>
-
+      <ChatSidebar
+        conversations={conversations}
+        activeConversationId={activeConversationId}
+        open={sidebarOpen}
+        isStreaming={isStreaming}
+        settingsButtonRef={settingsButtonRef}
+        onClose={() => setSidebarOpen(false)}
+        onNewChat={newChat}
+        onSearch={() => { setSearchOpen(true); setSidebarOpen(false); }}
+        onSettings={() => { setSettingsOpen(true); setSidebarOpen(false); }}
+        onOpenConversation={(id) => void openConversation(id)}
+      />
+      {sidebarOpen && (
+        <button className="sidebar-scrim" type="button" aria-label="Close sidebar" onClick={() => setSidebarOpen(false)} />
+      )}
+      <ChatPanel
+        messages={messages}
+        loadingChat={loadingChat}
+        input={input}
+        preset={preset}
+        isStreaming={isStreaming}
+        error={error}
+        textareaRef={textareaRef}
+        bottomRef={bottomRef}
+        onInputChange={setInput}
+        onPresetChange={setPreset}
+        onOpenSidebar={() => setSidebarOpen(true)}
+        onSend={() => void sendMessage()}
+        onStop={stopOutput}
+        onDismissError={() => setError("")}
+      />
       {searchOpen && (
-        <div className="search-overlay" role="dialog" aria-modal="true" aria-label="Search chats">
-          <button className="search-scrim" type="button" aria-label="Close search" onClick={() => setSearchOpen(false)} />
-          <section className="search-dialog">
-            <div className="search-input-wrap"><Search size={19} /><input autoFocus value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search your chats" /><button type="button" onClick={() => setSearchOpen(false)} aria-label="Close"><X size={19} /></button></div>
-            <div className="search-results">
-              {searchResults.length ? searchResults.map((conversation) => (
-                <button type="button" key={conversation.id} onClick={() => void openConversation(conversation.id)}>
-                  <MessageSquare size={17} /><span>{conversation.title}<small>{new Date(conversation.updated_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</small></span>
-                </button>
-              )) : <p>No chats found.</p>}
-            </div>
-          </section>
-        </div>
+        <SearchDialog
+          query={search.query}
+          results={search.results}
+          onQueryChange={search.setQuery}
+          onClose={() => setSearchOpen(false)}
+          onOpenConversation={(id) => void openConversation(id)}
+        />
+      )}
+      {settingsOpen && (
+        <SettingsDialog onClose={() => setSettingsOpen(false)} returnFocusRef={settingsButtonRef} />
       )}
     </main>
   );
