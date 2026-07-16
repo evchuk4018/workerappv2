@@ -31,6 +31,16 @@ function updateMessage(
   setMessages((current) => current.map((item) => item.id === id ? { ...item, ...update } : item));
 }
 
+export function replaceConversationTitle(
+  conversations: ConversationSummary[],
+  conversationId: string,
+  title: string,
+) {
+  return conversations.map((conversation) => conversation.id === conversationId
+    ? { ...conversation, title }
+    : conversation);
+}
+
 export function applyStreamEvent(
   event: StreamEvent,
   ids: StreamIds,
@@ -89,6 +99,15 @@ export function applyStreamEvent(
     context.setMessages((current) => current.map((item) => item.id === ids.assistant
       ? { ...item, content: `${item.content}${event.delta}` }
       : item));
+    return;
+  }
+
+  if (event.type === "title") {
+    context.setConversations((current) => replaceConversationTitle(
+      current,
+      event.conversationId,
+      event.title,
+    ));
     return;
   }
 

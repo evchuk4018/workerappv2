@@ -14,6 +14,7 @@ export interface Database {
           id: string;
           user_id: string;
           title: string;
+          title_finalized_at: string | null;
           system_prompt: string;
           created_at: string;
           updated_at: string;
@@ -22,12 +23,14 @@ export interface Database {
           id?: string;
           user_id: string;
           title: string;
+          title_finalized_at?: string | null;
           system_prompt?: string;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           title?: string;
+          title_finalized_at?: string | null;
           updated_at?: string;
         };
         Relationships: [];

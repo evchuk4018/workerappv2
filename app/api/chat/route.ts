@@ -3,6 +3,7 @@ import { encodeStreamEvent, parseDeepSeekSseBlock } from "@/lib/streaming";
 import { getAllowedUser } from "@/lib/supabase/auth-user";
 import { buildProviderMessages } from "@/lib/system-prompt";
 import { titleFromMessage } from "@/lib/title";
+import { finalizeConversationTitle } from "@/lib/title-finalization";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,16 +33,18 @@ export async function POST(request: Request) {
   const supabase = auth.supabase;
   let conversationId = body.conversationId ?? null;
   let title = titleFromMessage(message);
+  let titleFinalizedAt: string | null = null;
   let systemPrompt = "";
 
   if (conversationId) {
     const { data: existing } = await supabase
       .from("conversations")
-      .select("id,title,system_prompt")
+      .select("id,title,title_finalized_at,system_prompt")
       .eq("id", conversationId)
       .maybeSingle();
     if (!existing) return Response.json({ error: "Chat not found." }, { status: 404 });
     title = existing.title;
+    titleFinalizedAt = existing.title_finalized_at;
     systemPrompt = existing.system_prompt;
   } else {
     const { data: settings, error: settingsError } = await supabase
@@ -57,13 +60,14 @@ export async function POST(request: Request) {
     const { data: created, error } = await supabase
       .from("conversations")
       .insert({ user_id: auth.user.id, title, system_prompt: systemPrompt })
-      .select("id,title")
+      .select("id,title,title_finalized_at")
       .single();
     if (error || !created) {
       return Response.json({ error: "Unable to create the chat." }, { status: 500 });
     }
     conversationId = created.id;
     title = created.title;
+    titleFinalizedAt = created.title_finalized_at;
   }
 
   const { data: history, error: historyError } = await supabase
@@ -226,6 +230,26 @@ export async function POST(request: Request) {
             .update({ content, reasoning_content: reasoning, status: "completed", duration_ms: durationMs })
             .eq("id", assistantMessage.id)
             .eq("status", "streaming");
+          if (!titleFinalizedAt) {
+            const finalizedTitle = await finalizeConversationTitle({
+              supabase,
+              conversationId: stableConversationId,
+              messages: [
+                ...(history ?? []),
+                { role: "user", content: message },
+                { role: "assistant", content },
+              ],
+              apiKey: deepSeekKey,
+            });
+            if (finalizedTitle) {
+              title = finalizedTitle;
+              send({
+                type: "title",
+                conversationId: stableConversationId,
+                title: finalizedTitle,
+              });
+            }
+          }
           send({ type: "done", durationMs, status: "completed" });
         } catch (caught) {
           const durationMs = Date.now() - startedAt;

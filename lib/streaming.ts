@@ -8,6 +8,7 @@ export type StreamEvent =
     }
   | { type: "reasoning_delta"; delta: string }
   | { type: "content_delta"; delta: string }
+  | { type: "title"; conversationId: string; title: string }
   | { type: "done"; durationMs: number; status: "completed" | "stopped" }
   | { type: "error"; message: string };
 

@@ -5,7 +5,12 @@ import { ChatPanel } from "@/components/chat/chat-panel";
 import { ChatSidebar } from "@/components/chat/chat-sidebar";
 import { SearchDialog } from "@/components/chat/search-dialog";
 import { SettingsDialog } from "@/components/chat/settings-dialog";
-import { applyStreamEvent, type CurrentGeneration } from "@/components/chat/stream-event";
+import {
+  applyStreamEvent,
+  replaceConversationTitle,
+  type CurrentGeneration,
+} from "@/components/chat/stream-event";
+import { persistStoppedGeneration } from "@/components/chat/stop-generation";
 import { useConversationSearch } from "@/components/chat/use-conversation-search";
 import { type ModelPreset } from "@/lib/models";
 import { parseNdjsonBuffer, type StreamEvent } from "@/lib/streaming";
@@ -229,6 +234,7 @@ export function ChatApp({
   function stopOutput() {
     const generation = generationRef.current;
     if (!generation) return;
+    const conversationId = activeConversationId;
     const durationMs = Date.now() - generation.startedAt;
     generation.controller.abort();
     generationRef.current = null;
@@ -236,15 +242,9 @@ export function ChatApp({
     setIsStreaming(false);
 
     if (!generation.assistantId.startsWith("assistant-")) {
-      void fetch(`/api/messages/${generation.assistantId}/stop`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          content: generation.content,
-          reasoning: generation.reasoning,
-          durationMs,
-        }),
-        keepalive: true,
+      void persistStoppedGeneration(generation).then((title) => {
+        if (!title || !conversationId) return;
+        setConversations((current) => replaceConversationTitle(current, conversationId, title));
       });
     }
   }
