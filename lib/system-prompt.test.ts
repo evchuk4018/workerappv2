@@ -23,6 +23,23 @@ describe("system prompt settings", () => {
 });
 
 describe("system prompt injection", () => {
+  it("groups formatting, general behavior, and tool guidance into three paragraphs", () => {
+    const paragraphs = MARKDOWN_SYSTEM_PROMPT.split("\n\n");
+
+    expect(paragraphs).toHaveLength(3);
+    expect(paragraphs[0]).toContain("GitHub-Flavored Markdown");
+    expect(paragraphs[1]).toContain("spelling, grammar, or punctuation mistakes");
+    expect(paragraphs[2]).toContain("web_search and read_webpage tools");
+  });
+
+  it("includes intent, clarification, honesty, and preference guidance", () => {
+    expect(MARKDOWN_SYSTEM_PROMPT).toContain("Infer the user's intended meaning");
+    expect(MARKDOWN_SYSTEM_PROMPT).toContain("unless the user asks for language help");
+    expect(MARKDOWN_SYSTEM_PROMPT).toContain("ask a concise clarifying question");
+    expect(MARKDOWN_SYSTEM_PROMPT).toContain("Never fabricate facts, sources, tool results, or certainty");
+    expect(MARKDOWN_SYSTEM_PROMPT).toContain("saved preferences and current instructions");
+  });
+
   it("always adds the built-in prompt first when the custom prompt is blank", () => {
     const history = [{ role: "user" as const, content: "Hello" }];
     expect(buildProviderMessages(history, " \n")).toEqual([
