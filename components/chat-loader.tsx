@@ -10,7 +10,7 @@ export async function ChatLoader({ conversationId }: { conversationId?: string }
 
   const { data: conversations } = await auth.supabase
     .from("conversations")
-    .select("id,title,created_at,updated_at")
+    .select("id,title,memory_mode,created_at,updated_at")
     .order("updated_at", { ascending: false })
     .limit(100);
 

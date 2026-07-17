@@ -1,0 +1,7 @@
+[
+  { "case": "correction", "query": "Which editor do I use now?", "relevant": ["Uses Zed, not VS Code"], "irrelevant": ["Previously used VS Code"] },
+  { "case": "stale-context", "query": "What timezone should schedules use?", "relevant": ["Current timezone is America/New_York"], "irrelevant": ["Temporary trip used Europe/London"] },
+  { "case": "irrelevant-personalization", "query": "Explain database indexes", "relevant": ["Prefers concise technical explanations"], "irrelevant": ["Favorite dinner is ramen"] },
+  { "case": "explicit-forgetting", "query": "What is my former employer?", "relevant": [], "irrelevant": ["Worked at Acme"] },
+  { "case": "cross-conversation", "query": "Continue the launch checklist", "relevant": ["Launch project uses a staged rollout"], "irrelevant": ["Gardening notes"] }
+]

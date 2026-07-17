@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { AlertCircle, LoaderCircle, X } from "lucide-react";
 import { MAX_SYSTEM_PROMPT_LENGTH } from "@/lib/system-prompt";
+import { MemorySettingsPanel } from "@/components/chat/memory-settings-panel";
+import { DEFAULT_MEMORY_SETTINGS, type MemorySettings } from "@/lib/memory/types";
 
 const FOCUSABLE = [
   "button:not([disabled])",
@@ -23,6 +25,9 @@ export function SettingsDialog({ onClose, returnFocusRef }: SettingsDialogProps)
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [savedPrompt, setSavedPrompt] = useState("");
   const [draft, setDraft] = useState("");
+  const [savedMemory, setSavedMemory] = useState<MemorySettings>(DEFAULT_MEMORY_SETTINGS);
+  const [draftMemory, setDraftMemory] = useState<MemorySettings>(DEFAULT_MEMORY_SETTINGS);
+  const [section, setSection] = useState<"general" | "memory">("general");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -30,6 +35,7 @@ export function SettingsDialog({ onClose, returnFocusRef }: SettingsDialogProps)
   const dialogRef = useRef<HTMLElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const keepEditingRef = useRef<HTMLButtonElement>(null);
+  const dirty = draft !== savedPrompt || JSON.stringify(draftMemory) !== JSON.stringify(savedMemory);
 
   const closeNow = useCallback(() => {
     onClose();
@@ -37,12 +43,12 @@ export function SettingsDialog({ onClose, returnFocusRef }: SettingsDialogProps)
   }, [onClose, returnFocusRef]);
 
   const requestClose = useCallback(() => {
-    if (loadState === "ready" && draft !== savedPrompt) {
+    if (loadState === "ready" && dirty) {
       setConfirmDiscard(true);
       return;
     }
     closeNow();
-  }, [closeNow, draft, loadState, savedPrompt]);
+  }, [closeNow, dirty, loadState]);
 
   const saveSettings = useCallback(async () => {
     if (loadState !== "ready" || saving) return;
@@ -52,24 +58,27 @@ export function SettingsDialog({ onClose, returnFocusRef }: SettingsDialogProps)
       const response = await fetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ systemPrompt: draft }),
+        body: JSON.stringify({ systemPrompt: draft, memorySettings: draftMemory }),
       });
       const result = (await response.json().catch(() => ({}))) as {
         systemPrompt?: string;
+        memorySettings?: MemorySettings;
         error?: string;
       };
-      if (!response.ok || typeof result.systemPrompt !== "string") {
+      if (!response.ok || typeof result.systemPrompt !== "string" || !result.memorySettings) {
         throw new Error(result.error || "Unable to save settings.");
       }
       setSavedPrompt(result.systemPrompt);
       setDraft(result.systemPrompt);
+      setSavedMemory(result.memorySettings);
+      setDraftMemory(result.memorySettings);
       closeNow();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to save settings.");
     } finally {
       setSaving(false);
     }
-  }, [closeNow, draft, loadState, saving]);
+  }, [closeNow, draft, draftMemory, loadState, saving]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -81,13 +90,16 @@ export function SettingsDialog({ onClose, returnFocusRef }: SettingsDialogProps)
         });
         const result = (await response.json().catch(() => ({}))) as {
           systemPrompt?: string;
+          memorySettings?: MemorySettings;
           error?: string;
         };
-        if (!response.ok || typeof result.systemPrompt !== "string") {
+        if (!response.ok || typeof result.systemPrompt !== "string" || !result.memorySettings) {
           throw new Error(result.error || "Unable to load settings.");
         }
         setSavedPrompt(result.systemPrompt);
         setDraft(result.systemPrompt);
+        setSavedMemory(result.memorySettings);
+        setDraftMemory(result.memorySettings);
         setLoadState("ready");
       } catch (caught) {
         if (caught instanceof DOMException && caught.name === "AbortError") return;
@@ -101,8 +113,8 @@ export function SettingsDialog({ onClose, returnFocusRef }: SettingsDialogProps)
 
   useEffect(() => {
     if (confirmDiscard) keepEditingRef.current?.focus();
-    else if (loadState === "ready") textareaRef.current?.focus();
-  }, [confirmDiscard, loadState]);
+    else if (loadState === "ready" && section === "general") textareaRef.current?.focus();
+  }, [confirmDiscard, loadState, section]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -138,6 +150,7 @@ export function SettingsDialog({ onClose, returnFocusRef }: SettingsDialogProps)
 
   function discardChanges() {
     setDraft(savedPrompt);
+    setDraftMemory(savedMemory);
     closeNow();
   }
 
@@ -185,7 +198,11 @@ export function SettingsDialog({ onClose, returnFocusRef }: SettingsDialogProps)
 
         {loadState === "ready" && (
           <>
-            <div className="settings-field">
+            <nav className="settings-tabs" aria-label="Settings sections">
+              <button className={section === "general" ? "active" : ""} type="button" onClick={() => setSection("general")}>General</button>
+              <button className={section === "memory" ? "active" : ""} type="button" onClick={() => setSection("memory")}>Memory</button>
+            </nav>
+            {section === "general" ? <div className="settings-field">
               <div className="settings-label-row">
                 <label htmlFor="system-prompt">System prompt</label>
                 <span>{draft.length.toLocaleString()} / {MAX_SYSTEM_PROMPT_LENGTH.toLocaleString()}</span>
@@ -203,7 +220,9 @@ export function SettingsDialog({ onClose, returnFocusRef }: SettingsDialogProps)
                 placeholder="Describe how the assistant should behave…"
                 disabled={saving}
               />
-            </div>
+            </div> : (
+              <MemorySettingsPanel value={draftMemory} onChange={setDraftMemory} disabled={saving} />
+            )}
 
             {error && <div className="settings-save-error" role="alert">{error}</div>}
 
@@ -211,7 +230,7 @@ export function SettingsDialog({ onClose, returnFocusRef }: SettingsDialogProps)
               <div className="settings-discard" role="alertdialog" aria-label="Discard unsaved changes?">
                 <div>
                   <strong>Discard unsaved changes?</strong>
-                  <span>Your last saved system prompt will be kept.</span>
+                  <span>Your last saved settings will be kept.</span>
                 </div>
                 <div>
                   <button ref={keepEditingRef} type="button" onClick={() => setConfirmDiscard(false)}>Keep editing</button>

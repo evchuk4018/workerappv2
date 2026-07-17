@@ -1,21 +1,24 @@
 import { useEffect, type RefObject } from "react";
-import { ArrowUp, Menu, Sparkles, Square, X } from "lucide-react";
+import { ArrowUp, Brain, BrainCircuit, Menu, Sparkles, Square, X } from "lucide-react";
 import { Message } from "@/components/chat/message";
 import { ModelMenu } from "@/components/chat/model-menu";
 import type { ModelPreset } from "@/lib/models";
 import type { ChatMessage } from "@/lib/types";
+import type { MemoryMode } from "@/lib/memory/types";
 
 interface ChatPanelProps {
   messages: ChatMessage[];
   loadingChat: boolean;
   input: string;
   preset: ModelPreset;
+  memoryMode: MemoryMode;
   isStreaming: boolean;
   error: string;
   textareaRef: RefObject<HTMLTextAreaElement | null>;
   bottomRef: RefObject<HTMLDivElement | null>;
   onInputChange: (value: string) => void;
   onPresetChange: (value: ModelPreset) => void;
+  onToggleMemoryMode: () => void;
   onOpenSidebar: () => void;
   onSend: () => void;
   onStop: () => void;
@@ -27,12 +30,14 @@ export function ChatPanel({
   loadingChat,
   input,
   preset,
+  memoryMode,
   isStreaming,
   error,
   textareaRef,
   bottomRef,
   onInputChange,
   onPresetChange,
+  onToggleMemoryMode,
   onOpenSidebar,
   onSend,
   onStop,
@@ -96,6 +101,17 @@ export function ChatPanel({
           />
           <div className="composer-toolbar">
             <ModelMenu value={preset} onChange={onPresetChange} disabled={isStreaming} />
+            <button
+              className={`memory-mode-button ${memoryMode === "off" ? "memory-off" : ""}`}
+              type="button"
+              onClick={onToggleMemoryMode}
+              disabled={isStreaming}
+              aria-label={memoryMode === "off" ? "Turn memory on for this chat" : "Turn memory off for this chat"}
+              title={memoryMode === "off" ? "Memory is off for this chat" : "Memory is on for this chat"}
+            >
+              {memoryMode === "off" ? <Brain size={16} /> : <BrainCircuit size={16} />}
+              <span>{memoryMode === "off" ? "Memory off" : "Memory on"}</span>
+            </button>
             {isStreaming ? (
               <button className="send-button stop-button" type="button" onClick={onStop} aria-label="Stop response">
                 <Square size={14} fill="currentColor" />

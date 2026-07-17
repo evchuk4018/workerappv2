@@ -14,6 +14,21 @@ A focused, single-user DeepSeek V4 chat application built with Next.js and Supab
    `npx supabase db push --linked`.
 7. Run `npm run dev`.
 
+## Memory worker
+
+The production memory pipeline uses Postgres outbox rows, the `memory_jobs` PGMQ queue,
+`pg_cron`/`pg_net`, and the `memory-worker` Edge Function. The worker reads these Vault
+secrets; do not expose them to the browser:
+
+- `memory_worker_url` — the deployed Edge Function URL
+- `memory_worker_secret` — a random shared secret used only by cron and the worker
+- `deepseek_api_key` — the DeepSeek key used for extraction, summaries, and profiles
+
+Deploy with `npx supabase functions deploy memory-worker --no-verify-jwt`. The function
+implements its own constant-time shared-secret authentication. Run database tests with
+`npx supabase test db`; they cover RLS, grants, private jobs, queue routines, indexes,
+and the installed cron schedule.
+
 ## Commands
 
 - `npm run dev` — local development

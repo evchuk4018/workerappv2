@@ -7,6 +7,7 @@ describe("title stream events", () => {
     let conversations: ConversationSummary[] = [{
       id: "conversation-1",
       title: "Fallback title",
+      memory_mode: "normal",
       created_at: "2026-01-01T00:00:00.000Z",
       updated_at: "2026-01-01T00:00:00.000Z",
     }];

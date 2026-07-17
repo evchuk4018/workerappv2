@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getAllowedUser } from "@/lib/supabase/auth-user";
 import { GET, PUT } from "./route";
+import { DEFAULT_MEMORY_SETTINGS } from "@/lib/memory/types";
 
 vi.mock("@/lib/supabase/auth-user", () => ({
   getAllowedUser: vi.fn(),
@@ -50,7 +51,10 @@ describe("settings API", () => {
 
     const response = await GET();
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ systemPrompt: "" });
+    expect(await response.json()).toEqual({
+      systemPrompt: "",
+      memorySettings: DEFAULT_MEMORY_SETTINGS,
+    });
   });
 
   it("normalizes and upserts the authenticated user's prompt", async () => {
@@ -64,7 +68,10 @@ describe("settings API", () => {
     }));
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ systemPrompt: "" });
+    expect(await response.json()).toEqual({
+      systemPrompt: "",
+      memorySettings: DEFAULT_MEMORY_SETTINGS,
+    });
     expect(from).toHaveBeenCalledWith("user_settings");
     expect(upsert).toHaveBeenCalledWith(
       expect.objectContaining({ user_id: "user-123", system_prompt: "" }),

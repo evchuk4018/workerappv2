@@ -17,6 +17,10 @@
 .model-option span { display: flex; flex-direction: column; gap: 3px; }
 .model-option strong { font-size: 13px; font-weight: 600; }
 .model-option small { color: #919191; font-size: 11px; }
+.memory-mode-button { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; color: #a9a9a9; cursor: pointer; font-size: 12px; }
+.memory-mode-button:hover { background: #303030; color: #fff; }
+.memory-mode-button.memory-off { color: #d3a46d; }
+.memory-mode-button:disabled { opacity: .55; cursor: default; }
 .send-button { width: 34px; height: 34px; display: grid; place-items: center; border: 0; border-radius: 50%; background: #f4f4f4; color: #111; cursor: pointer; }
 .send-button:hover { background: #fff; }
 .send-button:disabled { background: #3d3d3d; color: #858585; cursor: default; }

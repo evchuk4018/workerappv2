@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getAllowedUser } from "@/lib/supabase/auth-user";
 
-const SELECT_FIELDS = "id,title,created_at,updated_at";
+const SELECT_FIELDS = "id,title,memory_mode,created_at,updated_at";
 
 export async function GET(request: NextRequest) {
   const auth = await getAllowedUser();

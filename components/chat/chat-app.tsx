@@ -11,7 +11,9 @@ import {
 } from "@/components/chat/stream-event";
 import { persistStoppedGeneration } from "@/components/chat/stop-generation";
 import { useConversationSearch } from "@/components/chat/use-conversation-search";
-import { type ModelPreset } from "@/lib/models";
+import { useStoredModelPreset } from "@/components/chat/use-stored-model-preset";
+import { buildOptimisticMessages } from "@/components/chat/optimistic-messages";
+import type { MemoryMode } from "@/lib/memory/types";
 import { parseNdjsonBuffer, type StreamEvent } from "@/lib/streaming";
 import type { ChatMessage, ConversationSummary } from "@/lib/types";
 export function ChatApp({
@@ -27,7 +29,10 @@ export function ChatApp({
   const [activeConversationId, setActiveConversationId] = useState(initialConversationId);
   const [messages, setMessages] = useState(initialMessages);
   const [input, setInput] = useState("");
-  const [preset, setPreset] = useState<ModelPreset>("medium");
+  const [preset, setPreset] = useStoredModelPreset();
+  const [memoryMode, setMemoryMode] = useState<MemoryMode>(
+    initialConversations.find((item) => item.id === initialConversationId)?.memory_mode ?? "normal",
+  );
   const [isStreaming, setIsStreaming] = useState(false);
   const [loadingChat, setLoadingChat] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -39,16 +44,6 @@ export function ChatApp({
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    const stored = window.localStorage.getItem("deepseek-model-preset") as ModelPreset | null;
-    if (stored && ["high", "medium", "low", "flash"].includes(stored)) {
-      const timeout = window.setTimeout(() => setPreset(stored), 0);
-      return () => window.clearTimeout(timeout);
-    }
-  }, []);
-  useEffect(() => {
-    window.localStorage.setItem("deepseek-model-preset", preset);
-  }, [preset]);
   useEffect(() => {
     const frame = requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ block: "end" }));
     return () => cancelAnimationFrame(frame);
@@ -80,6 +75,7 @@ export function ChatApp({
         messages: ChatMessage[];
       };
       setActiveConversationId(id);
+      setMemoryMode(data.conversation.memory_mode);
       setMessages(data.messages);
       if (pushHistory) window.history.pushState({ conversationId: id }, "", `/c/${id}`);
       setSidebarOpen(false);
@@ -110,6 +106,7 @@ export function ChatApp({
     if (isStreaming) return;
     setActiveConversationId(null);
     setMessages([]);
+    setMemoryMode("normal");
     setInput("");
     setError("");
     setSidebarOpen(false);
@@ -144,39 +141,17 @@ export function ChatApp({
     const timestamp = new Date().toISOString();
     const tempUserId = `user-${crypto.randomUUID()}`;
     const tempAssistantId = `assistant-${crypto.randomUUID()}`;
-    const optimisticConversationId = requestConversationId ?? "pending";
     const ids = { user: tempUserId, assistant: tempAssistantId };
     const controller = new AbortController();
 
-    setMessages((current) => [
-      ...current,
-      {
-        id: tempUserId,
-        conversation_id: optimisticConversationId,
-        role: "user",
-        content: message,
-        reasoning_content: null,
-        reasoning_blocks: [],
-        tool_activity: [],
-        model_preset: null,
-        status: "completed",
-        duration_ms: null,
-        created_at: timestamp,
-      },
-      {
-        id: tempAssistantId,
-        conversation_id: optimisticConversationId,
-        role: "assistant",
-        content: "",
-        reasoning_content: "",
-        reasoning_blocks: [],
-        tool_activity: [],
-        model_preset: preset,
-        status: "streaming",
-        duration_ms: null,
-        created_at: timestamp,
-      },
-    ]);
+    setMessages((current) => [...current, ...buildOptimisticMessages({
+      conversationId: requestConversationId,
+      message,
+      preset,
+      userId: tempUserId,
+      assistantId: tempAssistantId,
+      timestamp,
+    })]);
     setInput("");
     setError("");
     setIsStreaming(true);
@@ -194,7 +169,7 @@ export function ChatApp({
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId: requestConversationId, message, preset }),
+        body: JSON.stringify({ conversationId: requestConversationId, message, preset, memoryMode }),
         signal: controller.signal,
       });
 
@@ -249,6 +224,28 @@ export function ChatApp({
     }
   }
 
+  async function toggleMemoryMode() {
+    if (isStreaming) return;
+    const nextMode: MemoryMode = memoryMode === "normal" ? "off" : "normal";
+    if (!activeConversationId) {
+      setMemoryMode(nextMode);
+      return;
+    }
+    const response = await fetch(`/api/conversations/${activeConversationId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ memoryMode: nextMode }),
+    });
+    if (!response.ok) {
+      setError("Unable to update this chat's memory mode.");
+      return;
+    }
+    setMemoryMode(nextMode);
+    setConversations((current) => current.map((item) => item.id === activeConversationId
+      ? { ...item, memory_mode: nextMode }
+      : item));
+  }
+
   return (
     <main className="app-shell">
       <ChatSidebar
@@ -271,12 +268,14 @@ export function ChatApp({
         loadingChat={loadingChat}
         input={input}
         preset={preset}
+        memoryMode={memoryMode}
         isStreaming={isStreaming}
         error={error}
         textareaRef={textareaRef}
         bottomRef={bottomRef}
         onInputChange={setInput}
         onPresetChange={setPreset}
+        onToggleMemoryMode={() => void toggleMemoryMode()}
         onOpenSidebar={() => setSidebarOpen(true)}
         onSend={() => void sendMessage()}
         onStop={stopOutput}

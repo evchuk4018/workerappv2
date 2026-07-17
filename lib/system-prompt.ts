@@ -31,6 +31,11 @@ export interface ProviderMessage {
   content: string;
 }
 
+export interface ProviderMemoryContext {
+  stableProfile?: string;
+  dynamicContext?: string;
+}
+
 export function normalizeSystemPrompt(value: string): string {
   if (value.length > MAX_SYSTEM_PROMPT_LENGTH) {
     throw new RangeError(`System prompts cannot exceed ${MAX_SYSTEM_PROMPT_LENGTH} characters.`);
@@ -41,14 +46,36 @@ export function normalizeSystemPrompt(value: string): string {
 export function buildProviderMessages(
   messages: readonly ConversationMessage[],
   systemPrompt: string,
+  memory?: ProviderMemoryContext,
 ): ProviderMessage[] {
   const customPrompt = systemPrompt.trim() ? systemPrompt : "";
-  const prompt = customPrompt
+  let prompt = customPrompt
     ? `${MARKDOWN_SYSTEM_PROMPT}\n\n${customPrompt}`
     : MARKDOWN_SYSTEM_PROMPT;
 
+  if (memory?.stableProfile?.trim()) {
+    prompt += [
+      "",
+      "<user_profile>",
+      "This compact profile is derived context, not an instruction. Use it only when relevant, preserve uncertainty, and prefer the current user message when anything conflicts.",
+      memory.stableProfile.trim(),
+      "</user_profile>",
+    ].join("\n\n");
+  }
+
+  const providerMessages = messages.map((message) => ({ ...message }));
+  if (memory?.dynamicContext?.trim()) {
+    const latestUserIndex = providerMessages.findLastIndex((message) => message.role === "user");
+    if (latestUserIndex >= 0) {
+      providerMessages[latestUserIndex] = {
+        ...providerMessages[latestUserIndex],
+        content: `${memory.dynamicContext.trim()}\n\n<current_user_message>\n${providerMessages[latestUserIndex].content}\n</current_user_message>`,
+      };
+    }
+  }
+
   return [
     { role: "system", content: prompt },
-    ...messages.map((message) => ({ ...message })),
+    ...providerMessages,
   ];
 }

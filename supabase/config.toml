@@ -82,3 +82,6 @@ deno_version = 2
 enabled = true
 port = 54327
 backend = "postgres"
+
+[functions.memory-worker]
+verify_jwt = false

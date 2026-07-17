@@ -79,6 +79,7 @@ export function applyStreamEvent(
       {
         id: event.conversationId,
         title: event.title,
+        memory_mode: "normal",
         created_at: now,
         updated_at: now,
       },

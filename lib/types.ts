@@ -1,12 +1,14 @@
 import type { ModelPreset } from "@/lib/models";
 import type { ReasoningBlock } from "@/lib/reasoning-block";
 import type { ToolActivity } from "@/lib/tool-activity";
+import type { MemoryMode } from "@/lib/memory/types";
 
 export type MessageStatus = "streaming" | "completed" | "stopped" | "error";
 
 export interface ConversationSummary {
   id: string;
   title: string;
+  memory_mode: MemoryMode;
   created_at: string;
   updated_at: string;
 }

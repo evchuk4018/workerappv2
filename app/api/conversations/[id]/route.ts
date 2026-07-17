@@ -11,7 +11,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const [{ data: conversation }, { data: messages, error }] = await Promise.all([
     auth.supabase
       .from("conversations")
-      .select("id,title,created_at,updated_at")
+      .select("id,title,memory_mode,created_at,updated_at")
       .eq("id", id)
       .maybeSingle(),
     auth.supabase
@@ -31,4 +31,22 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       tool_activity: normalizeToolActivities(item.tool_activity),
     })) ?? [],
   });
+}
+
+export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
+  const auth = await getAllowedUser();
+  if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  let body: { memoryMode?: unknown };
+  try { body = (await request.json()) as { memoryMode?: unknown }; }
+  catch { return NextResponse.json({ error: "Invalid request body." }, { status: 400 }); }
+  if (body.memoryMode !== "normal" && body.memoryMode !== "off") {
+    return NextResponse.json({ error: "Invalid memory mode." }, { status: 400 });
+  }
+  const { id } = await context.params;
+  const { data, error } = await auth.supabase.from("conversations")
+    .update({ memory_mode: body.memoryMode, updated_at: new Date().toISOString() })
+    .eq("id", id).select("id,memory_mode").maybeSingle();
+  if (error) return NextResponse.json({ error: "Unable to update memory mode." }, { status: 500 });
+  if (!data) return NextResponse.json({ error: "Chat not found." }, { status: 404 });
+  return NextResponse.json({ memoryMode: data.memory_mode });
 }
