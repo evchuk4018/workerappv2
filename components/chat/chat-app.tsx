@@ -1,5 +1,4 @@
 "use client";
-
 import { useEffect, useRef, useState } from "react";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { ChatSidebar } from "@/components/chat/chat-sidebar";
@@ -15,7 +14,6 @@ import { useConversationSearch } from "@/components/chat/use-conversation-search
 import { type ModelPreset } from "@/lib/models";
 import { parseNdjsonBuffer, type StreamEvent } from "@/lib/streaming";
 import type { ChatMessage, ConversationSummary } from "@/lib/types";
-
 export function ChatApp({
   initialConversations,
   initialConversationId,
@@ -41,7 +39,6 @@ export function ChatApp({
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
-
   useEffect(() => {
     const stored = window.localStorage.getItem("deepseek-model-preset") as ModelPreset | null;
     if (stored && ["high", "medium", "low", "flash"].includes(stored)) {
@@ -49,16 +46,13 @@ export function ChatApp({
       return () => window.clearTimeout(timeout);
     }
   }, []);
-
   useEffect(() => {
     window.localStorage.setItem("deepseek-model-preset", preset);
   }, [preset]);
-
   useEffect(() => {
     const frame = requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ block: "end" }));
     return () => cancelAnimationFrame(frame);
   }, [messages]);
-
   async function refreshConversations() {
     try {
       const response = await fetch("/api/conversations");
@@ -162,6 +156,7 @@ export function ChatApp({
         role: "user",
         content: message,
         reasoning_content: null,
+        reasoning_blocks: [],
         tool_activity: [],
         model_preset: null,
         status: "completed",
@@ -174,6 +169,7 @@ export function ChatApp({
         role: "assistant",
         content: "",
         reasoning_content: "",
+        reasoning_blocks: [],
         tool_activity: [],
         model_preset: preset,
         status: "streaming",
@@ -189,6 +185,7 @@ export function ChatApp({
       assistantId: tempAssistantId,
       content: "",
       reasoning: "",
+      reasoningBlocks: [],
       activities: [],
       startedAt: Date.now(),
     };

@@ -16,6 +16,8 @@ interface ToolExecution {
 interface ToolTask {
   call: AgentToolCall;
   allowed: boolean;
+  roundIndex: number;
+  callIndex: number;
 }
 
 function safeArguments(value: string) {
@@ -59,24 +61,24 @@ export class WebToolExecutor {
     private readonly onActivity: (activity: ToolActivity) => void,
   ) {}
 
-  async executeRound(calls: readonly AgentToolCall[]) {
+  async executeRound(calls: readonly AgentToolCall[], roundIndex = 0) {
     let searches = 0;
     let reads = 0;
-    const tasks: ToolTask[] = calls.map((call) => {
+    const tasks: ToolTask[] = calls.map((call, callIndex) => {
       if (call.function.name === "web_search") {
         searches += 1;
-        return { call, allowed: searches <= SEARCHES_PER_ROUND };
+        return { call, allowed: searches <= SEARCHES_PER_ROUND, roundIndex, callIndex };
       }
       if (call.function.name === "read_webpage") {
         reads += 1;
-        return { call, allowed: reads <= READS_PER_ROUND };
+        return { call, allowed: reads <= READS_PER_ROUND, roundIndex, callIndex };
       }
-      return { call, allowed: true };
+      return { call, allowed: true, roundIndex, callIndex };
     });
     return mapConcurrent(tasks, TOOL_CONCURRENCY, (task) => this.execute(task));
   }
 
-  private async execute({ call, allowed }: ToolTask): Promise<ToolExecution> {
+  private async execute({ call, allowed, roundIndex, callIndex }: ToolTask): Promise<ToolExecution> {
     const isSearch = call.function.name === "web_search";
     const isRead = call.function.name === "read_webpage";
     if (!isSearch && !isRead) {
@@ -92,7 +94,8 @@ export class WebToolExecutor {
     } catch (caught) {
       const error = safeError(caught, provider);
       const activity: ToolActivity = {
-        id: call.id, kind, provider, status: "error", sources: [], error,
+        id: call.id, kind, provider, status: "error", round_index: roundIndex,
+        call_index: callIndex, sources: [], error,
         started_at: startedAt, completed_at: new Date().toISOString(),
       };
       this.onActivity(activity);
@@ -104,6 +107,8 @@ export class WebToolExecutor {
       kind,
       provider,
       status: "running",
+      round_index: roundIndex,
+      call_index: callIndex,
       ...(isSearch && typeof args.query === "string" ? { query: args.query.slice(0, 400) } : {}),
       ...(isRead && typeof args.url === "string" ? { url: args.url.slice(0, 2_048) } : {}),
       sources: [],

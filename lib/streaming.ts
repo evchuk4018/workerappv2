@@ -8,7 +8,8 @@ export type StreamEvent =
       assistantMessageId: string;
       title: string;
     }
-  | { type: "reasoning_delta"; delta: string }
+  | { type: "reasoning_delta"; roundIndex: number; delta: string }
+  | { type: "reasoning_round_complete"; roundIndex: number; durationMs: number }
   | { type: "content_delta"; delta: string }
   | { type: "tool_activity"; activity: ToolActivity }
   | { type: "title"; conversationId: string; title: string }

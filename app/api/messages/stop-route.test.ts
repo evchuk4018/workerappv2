@@ -53,6 +53,11 @@ describe("stop response route", () => {
         body: JSON.stringify({
           content: "A partial explanation",
           reasoning: "Partial reasoning",
+          reasoningBlocks: [{
+            round_index: 0,
+            content: "Partial reasoning",
+            duration_ms: 80,
+          }],
           toolActivity: [{
             id: "search-1",
             kind: "search",
@@ -73,6 +78,11 @@ describe("stop response route", () => {
     expect(stoppedUpdate.update).toHaveBeenCalledWith({
       content: "A partial explanation",
       reasoning_content: "Partial reasoning",
+      reasoning_blocks: [{
+        round_index: 0,
+        content: "Partial reasoning",
+        duration_ms: 80,
+      }],
       tool_activity: [expect.objectContaining({
         id: "search-1",
         status: "error",

@@ -23,6 +23,8 @@ describe("tool activity metadata", () => {
         kind: "search",
         provider: "brave",
         status: "completed",
+        round_index: 2,
+        call_index: 1,
         query: "x".repeat(700),
         sources: [{ title: "Source", url: "https://example.com", snippet: "y".repeat(700) }],
         started_at: "2026-01-01T00:00:00.000Z",
@@ -33,5 +35,6 @@ describe("tool activity metadata", () => {
     expect(normalized).toHaveLength(1);
     expect(normalized[0].query).toHaveLength(500);
     expect(normalized[0].sources[0].snippet).toHaveLength(500);
+    expect(normalized[0]).toMatchObject({ round_index: 2, call_index: 1 });
   });
 });

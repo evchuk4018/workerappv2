@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { getAllowedUser } from "@/lib/supabase/auth-user";
 import { finalizeConversationTitle } from "@/lib/title-finalization";
+import { normalizeReasoningBlocks } from "@/lib/reasoning-block";
 import { normalizeToolActivities } from "@/lib/tool-activity";
 
 interface StopBody {
   content?: unknown;
   reasoning?: unknown;
+  reasoningBlocks?: unknown;
   durationMs?: unknown;
   toolActivity?: unknown;
 }
@@ -24,6 +26,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
   const content = typeof body.content === "string" ? body.content : "";
   const reasoning = typeof body.reasoning === "string" ? body.reasoning : "";
+  const reasoningBlocks = normalizeReasoningBlocks(body.reasoningBlocks);
   const durationMs = typeof body.durationMs === "number" && body.durationMs >= 0
     ? Math.round(body.durationMs)
     : null;
@@ -49,6 +52,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     .update({
       content,
       reasoning_content: reasoning,
+      reasoning_blocks: reasoningBlocks,
       tool_activity: toolActivity,
       duration_ms: durationMs,
       status: "stopped",

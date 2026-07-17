@@ -1,8 +1,6 @@
-"use client";
-
-import { useState } from "react";
 import { BrainCircuit, ChevronDown } from "lucide-react";
-import type { MessageStatus } from "@/lib/types";
+import type { ToolActivity } from "@/lib/tool-activity";
+import { ToolActivityList } from "./tool-activity-list";
 
 function formatDuration(durationMs: number | null) {
   if (durationMs === null) return "";
@@ -13,44 +11,39 @@ function formatDuration(durationMs: number | null) {
 
 export function ThinkingBlock({
   reasoning,
-  status,
+  state,
   durationMs,
+  activities,
 }: {
   reasoning: string;
-  status: MessageStatus;
+  state: "active" | "completed" | "stopped";
   durationMs: number | null;
+  activities: ToolActivity[];
 }) {
-  const [manuallyOpen, setManuallyOpen] = useState(false);
-  const open = status === "streaming" || manuallyOpen;
-
-  if (!reasoning && status !== "streaming") return null;
+  if (!reasoning && !activities.length && state !== "active") return null;
   const duration = formatDuration(durationMs);
-  const label = status === "streaming"
+  const label = state === "active"
     ? "Thinking"
-    : status === "stopped"
+    : state === "stopped"
       ? `Stopped thinking${duration ? ` after ${duration}` : ""}`
       : `Thought${duration ? ` for ${duration}` : ""}`;
 
   return (
-    <section className={`thinking-block${open ? " is-open" : ""}`}>
-      <button
-        className="thinking-toggle"
-        type="button"
-        onClick={() => {
-          if (status !== "streaming") setManuallyOpen((value) => !value);
-        }}
-        aria-expanded={open}
-      >
+    <details className="thinking-block">
+      <summary className="thinking-toggle">
         <BrainCircuit size={17} />
         <span>{label}</span>
-        {status === "streaming" && <span className="thinking-pulse" aria-label="Generating" />}
+        {state === "active" && <span className="thinking-pulse" aria-label="Generating" />}
         <ChevronDown className="thinking-chevron" size={16} />
-      </button>
-      {open && (
-        <div className="thinking-content">
-          {reasoning || "Working through the request…"}
-        </div>
-      )}
-    </section>
+      </summary>
+      <div className="thinking-content">
+        {(reasoning || state === "active") && (
+          <div className="thinking-reasoning">
+            {reasoning || "Working through the request…"}
+          </div>
+        )}
+        <ToolActivityList activities={activities} />
+      </div>
+    </details>
   );
 }

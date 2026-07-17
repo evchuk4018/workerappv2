@@ -32,6 +32,7 @@ describe("DeepSeek web agent", () => {
   it("replays tool calls with reasoning content before streaming the grounded answer", async () => {
     let deepSeekCalls = 0;
     const activities: string[] = [];
+    const completedRounds: number[] = [];
     const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.includes("deepseek.com")) {
@@ -62,16 +63,19 @@ describe("DeepSeek web agent", () => {
       signal: new AbortController().signal,
       fetcher: fetcher as typeof fetch,
       onReasoning: () => undefined,
+      onReasoningComplete: (roundIndex) => completedRounds.push(roundIndex),
       onContent: () => undefined,
       onActivity: (activity) => activities.push(activity.status),
     });
 
     expect(result).toEqual({ content: "Grounded answer", reasoning: "I should search." });
     expect(activities).toEqual(["running", "completed"]);
+    expect(completedRounds).toEqual([0]);
   });
 
   it("forces a final answer after five tool rounds", async () => {
     let deepSeekCalls = 0;
+    const completedRounds: number[] = [];
     const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       if (String(input).includes("deepseek.com")) {
         deepSeekCalls += 1;
@@ -95,6 +99,7 @@ describe("DeepSeek web agent", () => {
       signal: new AbortController().signal,
       fetcher: fetcher as typeof fetch,
       onReasoning: () => undefined,
+      onReasoningComplete: (roundIndex) => completedRounds.push(roundIndex),
       onContent: () => undefined,
       onActivity: () => undefined,
     });
@@ -102,6 +107,7 @@ describe("DeepSeek web agent", () => {
     expect(deepSeekCalls).toBe(6);
     expect(result.content).toBe("Final answer");
     expect(result.reasoning).toBe("round-1round-2round-3round-4round-5");
+    expect(completedRounds).toEqual([0, 1, 2, 3, 4]);
   });
 
   it("propagates cancellation to the active DeepSeek request", async () => {
@@ -123,6 +129,7 @@ describe("DeepSeek web agent", () => {
       signal: controller.signal,
       fetcher: fetcher as typeof fetch,
       onReasoning: () => undefined,
+      onReasoningComplete: () => undefined,
       onContent: () => undefined,
       onActivity: () => undefined,
     });

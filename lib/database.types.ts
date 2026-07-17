@@ -1,4 +1,5 @@
 import type { ToolActivity } from "@/lib/tool-activity";
+import type { ReasoningBlock } from "@/lib/reasoning-block";
 
 export type Json =
   | string
@@ -61,6 +62,7 @@ export interface Database {
           role: "user" | "assistant";
           content: string;
           reasoning_content: string | null;
+          reasoning_blocks: ReasoningBlock[];
           tool_activity: ToolActivity[];
           model_preset: "high" | "medium" | "low" | "flash" | null;
           status: "streaming" | "completed" | "stopped" | "error";
@@ -73,6 +75,7 @@ export interface Database {
           role: "user" | "assistant";
           content?: string;
           reasoning_content?: string | null;
+          reasoning_blocks?: ReasoningBlock[];
           tool_activity?: ToolActivity[];
           model_preset?: "high" | "medium" | "low" | "flash" | null;
           status?: "streaming" | "completed" | "stopped" | "error";
@@ -82,6 +85,7 @@ export interface Database {
         Update: {
           content?: string;
           reasoning_content?: string | null;
+          reasoning_blocks?: ReasoningBlock[];
           tool_activity?: ToolActivity[];
           status?: "streaming" | "completed" | "stopped" | "error";
           duration_ms?: number | null;

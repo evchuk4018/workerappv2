@@ -6,8 +6,7 @@ import remarkMath from "remark-math";
 import { AlertCircle } from "lucide-react";
 import type { ComponentPropsWithoutRef } from "react";
 import type { ChatMessage } from "@/lib/types";
-import { ThinkingBlock } from "./thinking-block";
-import { ToolActivityList } from "./tool-activity-list";
+import { ReasoningTimeline } from "./reasoning-timeline";
 
 function LinkedImage({ src, alt }: ComponentPropsWithoutRef<"img">) {
   if (typeof src !== "string" || !src) {
@@ -27,12 +26,7 @@ export function Message({ message }: { message: ChatMessage }) {
 
   return (
     <article className="message-row assistant-row">
-      <ThinkingBlock
-        reasoning={message.reasoning_content ?? ""}
-        status={message.status}
-        durationMs={message.duration_ms}
-      />
-      <ToolActivityList activities={message.tool_activity} />
+      <ReasoningTimeline message={message} />
       {message.content ? (
         <div className="markdown-body">
           <Markdown
@@ -47,8 +41,6 @@ export function Message({ message }: { message: ChatMessage }) {
             {message.content}
           </Markdown>
         </div>
-      ) : message.status === "streaming" && !message.reasoning_content ? (
-        <div className="typing-dots" aria-label="DeepSeek is responding"><i /><i /><i /></div>
       ) : message.status === "error" ? (
         <div className="message-error"><AlertCircle size={17} /> DeepSeek could not complete this response.</div>
       ) : null}

@@ -11,6 +11,7 @@ function renderAssistant(content: string): string {
     role: "assistant",
     content,
     reasoning_content: null,
+    reasoning_blocks: [],
     tool_activity: [],
     model_preset: null,
     status: "completed",
@@ -76,5 +77,64 @@ $\notacommand{$
     expect(html).toContain("language-not-a-language");
     expect(html).not.toContain("hljs-name");
     expect(html).toContain("&lt;thing&gt;");
+  });
+});
+
+describe("assistant reasoning blocks", () => {
+  it("renders separate collapsed rounds with tool cards inside the matching block", () => {
+    const message: ChatMessage = {
+      id: "message-2",
+      conversation_id: "conversation-1",
+      role: "assistant",
+      content: "Final answer",
+      reasoning_content: "First thoughtSecond thought",
+      reasoning_blocks: [
+        { round_index: 0, content: "First thought", duration_ms: 1200 },
+        { round_index: 1, content: "Second thought", duration_ms: 800 },
+      ],
+      tool_activity: [{
+        id: "search-1",
+        kind: "search",
+        provider: "brave",
+        status: "completed",
+        round_index: 0,
+        call_index: 0,
+        query: "current answer",
+        sources: [],
+        started_at: "2026-07-16T00:00:00.000Z",
+      }],
+      model_preset: "medium",
+      status: "completed",
+      duration_ms: 5000,
+      created_at: "2026-07-16T00:00:00.000Z",
+    };
+
+    const html = renderToStaticMarkup(createElement(Message, { message }));
+    expect(html.match(/class="thinking-block"/g)).toHaveLength(2);
+    expect(html).not.toContain('<details class="thinking-block" open=""');
+    expect(html.indexOf("First thought")).toBeLessThan(html.indexOf("Searched for"));
+    expect(html.indexOf("Searched for")).toBeLessThan(html.indexOf("Second thought"));
+    expect(html).toContain("Thought for 1s");
+    expect(html).toContain("Thought for under a second");
+  });
+
+  it("falls back to one collapsed block for legacy flattened traces", () => {
+    const message: ChatMessage = {
+      id: "message-3",
+      conversation_id: "conversation-1",
+      role: "assistant",
+      content: "Answer",
+      reasoning_content: "Legacy thought",
+      reasoning_blocks: [],
+      tool_activity: [],
+      model_preset: "medium",
+      status: "completed",
+      duration_ms: 1500,
+      created_at: "2026-07-16T00:00:00.000Z",
+    };
+
+    const html = renderToStaticMarkup(createElement(Message, { message }));
+    expect(html.match(/class="thinking-block"/g)).toHaveLength(1);
+    expect(html).toContain("Legacy thought");
   });
 });

@@ -42,6 +42,10 @@ describe("per-round web tool allowances", () => {
     expect(fetcher).toHaveBeenCalledTimes(4);
     expect(activities.some((activity) => activity.id === "call-5" && activity.status === "completed"))
       .toBe(true);
+    expect(activities.find((activity) => activity.id === "call-1")).toMatchObject({
+      round_index: 0,
+      call_index: 0,
+    });
   });
 
   it("returns structured errors when every provider key is exhausted", async () => {

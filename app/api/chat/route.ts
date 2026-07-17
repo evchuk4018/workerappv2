@@ -5,6 +5,11 @@ import { getAllowedUser } from "@/lib/supabase/auth-user";
 import { buildProviderMessages } from "@/lib/system-prompt";
 import { titleFromMessage } from "@/lib/title";
 import { finalizeConversationTitle } from "@/lib/title-finalization";
+import {
+  appendReasoningDelta,
+  completeReasoningBlock,
+  type ReasoningBlock,
+} from "@/lib/reasoning-block";
 import { type ToolActivity, upsertToolActivity } from "@/lib/tool-activity";
 import { parseApiKeys } from "@/lib/web/key-failover";
 
@@ -97,6 +102,7 @@ export async function POST(request: Request) {
       role: "assistant",
       content: "",
       reasoning_content: "",
+      reasoning_blocks: [],
       model_preset: body.preset,
       status: "streaming",
     })
@@ -120,6 +126,7 @@ export async function POST(request: Request) {
     start(controller) {
       let content = "";
       let reasoning = "";
+      let reasoningBlocks: ReasoningBlock[] = [];
       let activities: ToolActivity[] = [];
       let activityWrites = Promise.resolve();
       let outputOpen = true;
@@ -176,9 +183,14 @@ export async function POST(request: Request) {
             braveKeys,
             tavilyKeys,
             signal: upstreamController.signal,
-            onReasoning(delta) {
+            onReasoning(delta, roundIndex) {
               reasoning += delta;
-              send({ type: "reasoning_delta", delta });
+              reasoningBlocks = appendReasoningDelta(reasoningBlocks, roundIndex, delta);
+              send({ type: "reasoning_delta", roundIndex, delta });
+            },
+            onReasoningComplete(roundIndex, durationMs) {
+              reasoningBlocks = completeReasoningBlock(reasoningBlocks, roundIndex, durationMs);
+              send({ type: "reasoning_round_complete", roundIndex, durationMs });
             },
             onContent(delta) {
               content += delta;
@@ -208,6 +220,7 @@ export async function POST(request: Request) {
             .update({
               content,
               reasoning_content: reasoning,
+              reasoning_blocks: reasoningBlocks,
               tool_activity: activities,
               status: "completed",
               duration_ms: durationMs,
@@ -244,6 +257,7 @@ export async function POST(request: Request) {
             .update({
               content,
               reasoning_content: reasoning,
+              reasoning_blocks: reasoningBlocks,
               tool_activity: activities,
               status: stopped ? "stopped" : "error",
               duration_ms: durationMs,

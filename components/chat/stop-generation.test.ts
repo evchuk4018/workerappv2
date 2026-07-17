@@ -17,6 +17,7 @@ describe("stopped generation persistence", () => {
       assistantId: "assistant-1",
       content: "Partial answer",
       reasoning: "Partial reasoning",
+      reasoningBlocks: [{ round_index: 0, content: "Partial reasoning", duration_ms: null }],
       activities: [],
       startedAt: Date.now(),
     })).resolves.toBe("Partial response title");
@@ -25,6 +26,11 @@ describe("stopped generation persistence", () => {
       keepalive: true,
     }));
     const body = JSON.parse(String(fetcher.mock.calls[0][1]?.body));
-    expect(body).toMatchObject({ content: "Partial answer", reasoning: "Partial reasoning", toolActivity: [] });
+    expect(body).toMatchObject({
+      content: "Partial answer",
+      reasoning: "Partial reasoning",
+      reasoningBlocks: [{ round_index: 0, content: "Partial reasoning", duration_ms: null }],
+      toolActivity: [],
+    });
   });
 });

@@ -1,6 +1,11 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { StreamEvent } from "@/lib/streaming";
 import type { ChatMessage, ConversationSummary } from "@/lib/types";
+import {
+  appendReasoningDelta,
+  completeReasoningBlock,
+  type ReasoningBlock,
+} from "@/lib/reasoning-block";
 import { type ToolActivity, upsertToolActivity } from "@/lib/tool-activity";
 
 export interface CurrentGeneration {
@@ -8,6 +13,7 @@ export interface CurrentGeneration {
   assistantId: string;
   content: string;
   reasoning: string;
+  reasoningBlocks: ReasoningBlock[];
   activities: ToolActivity[];
   startedAt: number;
 }
@@ -89,9 +95,45 @@ export function applyStreamEvent(
   }
 
   if (event.type === "reasoning_delta") {
-    if (context.generationRef.current) context.generationRef.current.reasoning += event.delta;
+    if (context.generationRef.current) {
+      context.generationRef.current.reasoning += event.delta;
+      context.generationRef.current.reasoningBlocks = appendReasoningDelta(
+        context.generationRef.current.reasoningBlocks,
+        event.roundIndex,
+        event.delta,
+      );
+    }
     context.setMessages((current) => current.map((item) => item.id === ids.assistant
-      ? { ...item, reasoning_content: `${item.reasoning_content ?? ""}${event.delta}` }
+      ? {
+          ...item,
+          reasoning_content: `${item.reasoning_content ?? ""}${event.delta}`,
+          reasoning_blocks: appendReasoningDelta(
+            item.reasoning_blocks,
+            event.roundIndex,
+            event.delta,
+          ),
+        }
+      : item));
+    return;
+  }
+
+  if (event.type === "reasoning_round_complete") {
+    if (context.generationRef.current) {
+      context.generationRef.current.reasoningBlocks = completeReasoningBlock(
+        context.generationRef.current.reasoningBlocks,
+        event.roundIndex,
+        event.durationMs,
+      );
+    }
+    context.setMessages((current) => current.map((item) => item.id === ids.assistant
+      ? {
+          ...item,
+          reasoning_blocks: completeReasoningBlock(
+            item.reasoning_blocks,
+            event.roundIndex,
+            event.durationMs,
+          ),
+        }
       : item));
     return;
   }

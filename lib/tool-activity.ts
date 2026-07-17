@@ -12,6 +12,8 @@ export interface ToolActivity {
   kind: "search" | "read";
   provider: "brave" | "tavily";
   status: ToolActivityStatus;
+  round_index?: number;
+  call_index?: number;
   query?: string;
   url?: string;
   extraction_mode?: ExtractionMode;
@@ -22,6 +24,10 @@ export interface ToolActivity {
 }
 
 const TEXT_LIMIT = 500;
+
+function cleanIndex(value: unknown) {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : undefined;
+}
 
 function cleanText(value: unknown, limit = TEXT_LIMIT) {
   return typeof value === "string" ? value.trim().slice(0, limit) : "";
@@ -73,6 +79,12 @@ export function normalizeToolActivities(value: unknown): ToolActivity[] {
       kind,
       provider,
       status,
+      ...(cleanIndex(item.round_index) !== undefined
+        ? { round_index: cleanIndex(item.round_index) }
+        : {}),
+      ...(cleanIndex(item.call_index) !== undefined
+        ? { call_index: cleanIndex(item.call_index) }
+        : {}),
       ...(cleanText(item.query) ? { query: cleanText(item.query) } : {}),
       ...(cleanText(item.url, 2_048) ? { url: cleanText(item.url, 2_048) } : {}),
       ...(extractionMode ? { extraction_mode: extractionMode } : {}),

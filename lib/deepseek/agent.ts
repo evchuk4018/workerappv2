@@ -11,7 +11,8 @@ import { WebToolExecutor } from "@/lib/deepseek/web-tools";
 const MAX_TOOL_ROUNDS = 5;
 
 interface AgentCallbacks {
-  onReasoning: (delta: string) => void;
+  onReasoning: (delta: string, roundIndex: number) => void;
+  onReasoningComplete: (roundIndex: number, durationMs: number) => void;
   onContent: (delta: string) => void;
   onActivity: (activity: ToolActivity) => void;
 }
@@ -53,6 +54,7 @@ async function streamRound(
   options: RunAgentOptions,
   messages: AgentMessage[],
   allowTools: boolean,
+  roundIndex: number,
 ): Promise<RoundResult> {
   const response = await (options.fetcher ?? fetch)("https://api.deepseek.com/chat/completions", {
     method: "POST",
@@ -83,7 +85,7 @@ async function streamRound(
     if (!delta) return false;
     if (delta.reasoning) {
       reasoning += delta.reasoning;
-      options.onReasoning(delta.reasoning);
+      options.onReasoning(delta.reasoning, roundIndex);
     }
     if (delta.content) {
       content += delta.content;
@@ -128,9 +130,18 @@ export async function runDeepSeekAgent(options: RunAgentOptions) {
   let toolRounds = 0;
 
   while (true) {
-    const round = await streamRound(options, messages, toolRounds < MAX_TOOL_ROUNDS);
+    const roundStartedAt = Date.now();
+    const round = await streamRound(
+      options,
+      messages,
+      toolRounds < MAX_TOOL_ROUNDS,
+      toolRounds,
+    );
     fullContent += round.content;
     fullReasoning += round.reasoning;
+    if (round.reasoning || round.toolCalls.length) {
+      options.onReasoningComplete(toolRounds, Date.now() - roundStartedAt);
+    }
 
     if (!round.toolCalls.length || toolRounds >= MAX_TOOL_ROUNDS) {
       return { content: fullContent, reasoning: fullReasoning };
@@ -142,7 +153,7 @@ export async function runDeepSeekAgent(options: RunAgentOptions) {
       reasoning_content: round.reasoning || null,
       tool_calls: round.toolCalls,
     });
-    const results = await executor.executeRound(round.toolCalls);
+    const results = await executor.executeRound(round.toolCalls, toolRounds);
     results.forEach((result, index) => {
       messages.push({
         role: "tool",
