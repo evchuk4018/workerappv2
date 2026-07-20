@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { runDeepSeekAgent } from "./agent";
+import { resumeAgentState, runDeepSeekAgent, runDeepSeekAgentUntilPause } from "./agent";
 
 function sse(chunks: unknown[]) {
   const body = [
@@ -29,6 +29,45 @@ function toolRound(id: string, reasoning = "I should search.") {
 }
 
 describe("DeepSeek web agent", () => {
+  it("pauses for browser Python and resumes the same tool transcript", async () => {
+    let calls = 0;
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      calls += 1;
+      if (calls === 1) return sse([{
+        choices: [{
+          delta: { tool_calls: [{
+            index: 0, id: "python-1",
+            function: {
+              name: "run_python",
+              arguments: JSON.stringify({ code: "print(6 * 7)", packages: [], input_file_ids: [] }),
+            },
+          }] },
+          finish_reason: "tool_calls",
+        }],
+      }]);
+      const body = JSON.parse(String(init?.body));
+      expect(body.messages.at(-1)).toEqual({
+        role: "tool", tool_call_id: "python-1", content: '{"stdout":"42"}',
+      });
+      return sse([{ choices: [{ delta: { content: "The verified result is 42." }, finish_reason: "stop" }] }]);
+    });
+    const options = {
+      apiKey: "deepseek", preset: "medium" as const,
+      messages: [{ role: "user" as const, content: "Verify 6 * 7" }],
+      braveKeys: [], tavilyKeys: [], signal: new AbortController().signal,
+      fetcher: fetcher as typeof fetch, onReasoning: () => undefined,
+      onReasoningComplete: () => undefined, onContent: () => undefined,
+      onActivity: () => undefined,
+    };
+    const paused = await runDeepSeekAgentUntilPause(options);
+    expect(paused.status).toBe("awaiting_python");
+    if (paused.status !== "awaiting_python") return;
+    const resumed = resumeAgentState(paused.state, paused.request.callId, '{"stdout":"42"}');
+    const completed = await runDeepSeekAgentUntilPause(options, resumed);
+    expect(completed.status).toBe("completed");
+    expect(completed.state.content).toBe("The verified result is 42.");
+  });
+
   it("replays tool calls with reasoning content before streaming the grounded answer", async () => {
     let deepSeekCalls = 0;
     const activities: string[] = [];

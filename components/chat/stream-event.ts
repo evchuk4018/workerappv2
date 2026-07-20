@@ -160,6 +160,8 @@ export function applyStreamEvent(
     return;
   }
 
+  if (event.type === "python_request") return;
+
   if (event.type === "title") {
     context.setConversations((current) => replaceConversationTitle(
       current,

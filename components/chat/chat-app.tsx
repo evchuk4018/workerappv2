@@ -12,9 +12,12 @@ import {
 import { persistStoppedGeneration } from "@/components/chat/stop-generation";
 import { useConversationSearch } from "@/components/chat/use-conversation-search";
 import { useStoredModelPreset } from "@/components/chat/use-stored-model-preset";
+import { useChatRunner } from "@/components/chat/use-chat-runner";
+import { usePendingRunRecovery } from "@/components/chat/use-pending-run-recovery";
+import { usePendingAttachments } from "@/components/chat/use-pending-attachments";
 import { buildOptimisticMessages } from "@/components/chat/optimistic-messages";
 import type { MemoryMode } from "@/lib/memory/types";
-import { parseNdjsonBuffer, type StreamEvent } from "@/lib/streaming";
+import type { StreamEvent } from "@/lib/streaming";
 import type { ChatMessage, ConversationSummary } from "@/lib/types";
 export function ChatApp({
   initialConversations,
@@ -39,6 +42,7 @@ export function ChatApp({
   const [searchOpen, setSearchOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [error, setError] = useState("");
+  const attachments = usePendingAttachments(setError);
   const search = useConversationSearch(searchOpen, initialConversations);
   const generationRef = useRef<CurrentGeneration | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -58,7 +62,6 @@ export function ChatApp({
       // Current history remains usable offline.
     }
   }
-
   async function openConversation(id: string, pushHistory = true) {
     if (isStreaming || id === activeConversationId) {
       setSidebarOpen(false);
@@ -86,7 +89,6 @@ export function ChatApp({
       setLoadingChat(false);
     }
   }
-
   useEffect(() => {
     function handlePopState() {
       const match = window.location.pathname.match(/^\/c\/([^/]+)$/);
@@ -101,7 +103,6 @@ export function ChatApp({
     // openConversation intentionally follows the current component state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isStreaming, activeConversationId]);
-
   function newChat() {
     if (isStreaming) return;
     setActiveConversationId(null);
@@ -109,16 +110,15 @@ export function ChatApp({
     setMemoryMode("normal");
     setInput("");
     setError("");
+    attachments.clear();
     setSidebarOpen(false);
     setSearchOpen(false);
     window.history.pushState({}, "", "/");
     window.setTimeout(() => textareaRef.current?.focus(), 0);
   }
-
   function updateMessage(id: string, update: Partial<ChatMessage>) {
     setMessages((current) => current.map((item) => item.id === id ? { ...item, ...update } : item));
   }
-
   function handleStreamEvent(
     event: StreamEvent,
     ids: { user: string; assistant: string },
@@ -132,7 +132,27 @@ export function ChatApp({
       setError,
     });
   }
-
+  const runner = useChatRunner({
+    preset, memoryMode, activeConversationId, generationRef, setMessages,
+    setIsStreaming, setError, onEvent: handleStreamEvent,
+    onSettled: () => void refreshConversations(),
+  });
+  usePendingRunRecovery({
+    conversationId: activeConversationId, messages, isStreaming, runner,
+    startGeneration: (generation) => { generationRef.current = generation; },
+    finishGeneration: (controller) => {
+      if (generationRef.current?.controller === controller) generationRef.current = null;
+      setIsStreaming(false);
+    },
+    setMessages, setIsStreaming, setError, onSettled: () => void refreshConversations(),
+  });
+  async function deleteConversation(id: string) {
+    if (!window.confirm("Delete this chat and all of its stored files? This cannot be undone.")) return;
+    const response = await fetch(`/api/conversations/${id}`, { method: "DELETE" });
+    if (!response.ok) return setError("Unable to delete this chat and its files.");
+    setConversations((current) => current.filter((item) => item.id !== id));
+    if (id === activeConversationId) newChat();
+  }
   async function sendMessage() {
     const message = input.trim();
     if (!message || isStreaming) return;
@@ -144,14 +164,16 @@ export function ChatApp({
     const ids = { user: tempUserId, assistant: tempAssistantId };
     const controller = new AbortController();
 
-    setMessages((current) => [...current, ...buildOptimisticMessages({
-      conversationId: requestConversationId,
-      message,
-      preset,
+    const optimistic = buildOptimisticMessages({
+      conversationId: requestConversationId, message, preset,
       userId: tempUserId,
       assistantId: tempAssistantId,
       timestamp,
-    })]);
+    });
+    optimistic[0].attachments = attachments.items.map((file) => ({ ...file, created_at: timestamp }));
+    setMessages((current) => [...current, ...optimistic]);
+    const files = attachments.files;
+    attachments.clear();
     setInput("");
     setError("");
     setIsStreaming(true);
@@ -166,32 +188,7 @@ export function ChatApp({
     };
 
     try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId: requestConversationId, message, preset, memoryMode }),
-        signal: controller.signal,
-      });
-
-      if (!response.ok || !response.body) {
-        const result = (await response.json().catch(() => ({}))) as { error?: string };
-        throw new Error(result.error || "Unable to start the response.");
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const parsed = parseNdjsonBuffer(buffer);
-        buffer = parsed.remainder;
-        parsed.events.forEach((event) => handleStreamEvent(event, ids, requestConversationId));
-      }
-      if (buffer.trim()) {
-        handleStreamEvent(JSON.parse(buffer) as StreamEvent, ids, requestConversationId);
-      }
+      await runner.send(message, files, ids);
     } catch (caught) {
       if (!(caught instanceof DOMException && caught.name === "AbortError")) {
         setError(caught instanceof Error ? caught.message : "The response failed.");
@@ -212,6 +209,7 @@ export function ChatApp({
     const conversationId = activeConversationId;
     const durationMs = Date.now() - generation.startedAt;
     generation.controller.abort();
+    runner.reset();
     generationRef.current = null;
     updateMessage(generation.assistantId, { status: "stopped", duration_ms: durationMs });
     setIsStreaming(false);
@@ -259,6 +257,7 @@ export function ChatApp({
         onSearch={() => { setSearchOpen(true); setSidebarOpen(false); }}
         onSettings={() => { setSettingsOpen(true); setSidebarOpen(false); }}
         onOpenConversation={(id) => void openConversation(id)}
+        onDeleteConversation={(id) => void deleteConversation(id)}
       />
       {sidebarOpen && (
         <button className="sidebar-scrim" type="button" aria-label="Close sidebar" onClick={() => setSidebarOpen(false)} />
@@ -280,6 +279,9 @@ export function ChatApp({
         onSend={() => void sendMessage()}
         onStop={stopOutput}
         onDismissError={() => setError("")}
+        attachments={attachments.items}
+        onFilesSelected={attachments.add}
+        onRemoveAttachment={attachments.remove}
       />
       {searchOpen && (
         <SearchDialog

@@ -29,6 +29,20 @@ implements its own constant-time shared-secret authentication. Run database test
 `npx supabase test db`; they cover RLS, grants, private jobs, queue routines, indexes,
 and the installed cron schedule.
 
+## Browser Python analysis
+
+DeepSeek can call `run_python` to verify calculations, analyze CSV/TSV/JSON/XLSX/TXT
+attachments, and create plots or downloadable files. Python runs in a sandboxed browser
+iframe and Web Worker using the pinned Pyodide runtime, so no separate Python server is
+required. The first run downloads the runtime and requested compatible packages from the
+Pyodide/PyPI CDNs.
+
+Inputs and generated artifacts are stored in the private `chat-files` Supabase Storage
+bucket and remain until their chat is deleted. Runs allow 25 MiB of total inputs, 30 seconds
+of Python execution, and up to five 10 MiB outputs. Network calls run automatically but are
+limited by normal browser CORS rules. Only pure-Python wheels and packages built for
+Pyodide/WebAssembly can be installed; native CPython-only wheels will fail clearly.
+
 ## Commands
 
 - `npm run dev` — local development

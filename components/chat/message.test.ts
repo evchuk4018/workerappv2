@@ -138,3 +138,33 @@ describe("assistant reasoning blocks", () => {
     expect(html).toContain("Legacy thought");
   });
 });
+
+describe("user attachments", () => {
+  it("renders attached file metadata below the user message", () => {
+    const message: ChatMessage = {
+      id: "message-4",
+      conversation_id: "conversation-1",
+      role: "user",
+      content: "Analyze this file",
+      reasoning_content: null,
+      reasoning_blocks: [],
+      tool_activity: [],
+      model_preset: null,
+      status: "completed",
+      duration_ms: null,
+      created_at: "2026-07-18T00:00:00.000Z",
+      attachments: [{
+        id: "file-1",
+        name: "sales.csv",
+        mime_type: "text/csv",
+        size_bytes: 2048,
+        created_at: "2026-07-18T00:00:00.000Z",
+      }],
+    };
+
+    const html = renderToStaticMarkup(createElement(Message, { message }));
+    expect(html).toContain("Analyze this file");
+    expect(html).toContain("sales.csv");
+    expect(html).toContain("2 KB");
+  });
+});

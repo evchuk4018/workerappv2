@@ -28,7 +28,6 @@ describe("stop response route", () => {
       data: { id: "assistant-1", conversation_id: "conversation-1" },
       error: null,
     });
-    const stoppedUpdate = chain({ data: null, error: null });
     const conversationLookup = chain({ data: { title_finalized_at: null }, error: null });
     const transcript = [
       { role: "user", content: "Explain streaming" },
@@ -40,8 +39,9 @@ describe("stop response route", () => {
       from: vi.fn((table: string) => {
         if (table === "conversations") return conversationLookup;
         messageCall += 1;
-        return [assistantLookup, stoppedUpdate, transcriptLookup][messageCall - 1];
+        return [assistantLookup, transcriptLookup][messageCall - 1];
       }),
+      rpc: vi.fn().mockResolvedValue({ data: "stopped", error: null }),
     };
     vi.mocked(getAllowedUser).mockResolvedValue({ supabase, user: { id: "user-1" } } as never);
     vi.mocked(finalizeConversationTitle).mockResolvedValue("Streaming Responses");
@@ -75,21 +75,21 @@ describe("stop response route", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ ok: true, title: "Streaming Responses" });
-    expect(stoppedUpdate.update).toHaveBeenCalledWith({
-      content: "A partial explanation",
-      reasoning_content: "Partial reasoning",
-      reasoning_blocks: [{
+    expect(supabase.rpc).toHaveBeenCalledWith("stop_agent_run", {
+      p_assistant_message_id: "assistant-1",
+      p_content: "A partial explanation",
+      p_reasoning: "Partial reasoning",
+      p_reasoning_blocks: [{
         round_index: 0,
         content: "Partial reasoning",
         duration_ms: 80,
       }],
-      tool_activity: [expect.objectContaining({
+      p_tool_activity: [expect.objectContaining({
         id: "search-1",
         status: "error",
         error: "Stopped before this tool completed.",
       })],
-      duration_ms: 123,
-      status: "stopped",
+      p_duration_ms: 123,
     });
     expect(finalizeConversationTitle).toHaveBeenCalledWith(expect.objectContaining({
       conversationId: "conversation-1",

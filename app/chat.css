@@ -70,6 +70,10 @@
 }
 .conversation-list button:hover, .conversation-list button.active { background: #242424; color: #fff; }
 .conversation-list button:disabled { cursor: default; }
+.conversation-row { display: grid; grid-template-columns: minmax(0, 1fr) 32px; align-items: center; gap: 2px; }
+.conversation-row > button:first-child { min-width: 0; }
+.conversation-row .delete-conversation { display: grid; place-items: center; padding: 7px; opacity: 0; }
+.conversation-row:hover .delete-conversation, .conversation-row:focus-within .delete-conversation { opacity: .72; }
 .empty-recents { padding: 3px 10px; color: var(--faint); font-size: 12px; line-height: 1.5; }
 .sidebar-footer { margin-top: 8px; padding-top: 8px; border-top: 1px solid #242424; }
 .sidebar-scrim { display: none; }

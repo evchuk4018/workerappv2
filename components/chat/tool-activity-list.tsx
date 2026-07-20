@@ -1,5 +1,6 @@
 import { BookOpen, ChevronDown, CircleAlert, LoaderCircle, Search } from "lucide-react";
-import type { ToolActivity } from "@/lib/tool-activity";
+import type { ToolActivity, WebToolActivity } from "@/lib/tool-activity";
+import { PythonActivityCard } from "./python-activity-card";
 
 function safeLink(value: string) {
   try {
@@ -18,7 +19,7 @@ function hostname(value: string) {
   }
 }
 
-function label(activity: ToolActivity) {
+function label(activity: WebToolActivity) {
   if (activity.kind === "search") {
     return activity.status === "running"
       ? `Searching for “${activity.query || "the web"}”`
@@ -33,8 +34,11 @@ export function ToolActivityList({ activities }: { activities: ToolActivity[] })
   if (!activities.length) return null;
 
   return (
-    <div className="tool-activity-list" aria-label="Web activity">
+    <div className="tool-activity-list" aria-label="Tool activity">
       {activities.map((activity) => {
+        if (activity.kind === "python") {
+          return <PythonActivityCard activity={activity} key={activity.id} />;
+        }
         const Icon = activity.status === "error"
           ? CircleAlert
           : activity.kind === "search"
@@ -55,7 +59,9 @@ export function ToolActivityList({ activities }: { activities: ToolActivity[] })
                   <a href={safeLink(activity.url) ?? undefined} target="_blank" rel="noreferrer">
                     {activity.url}
                   </a>
-                  {activity.extraction_mode && <span className="tool-mode">{activity.extraction_mode} extraction</span>}
+                  {activity.extraction_mode && (
+                    <span className="tool-mode">{activity.extraction_mode} extraction</span>
+                  )}
                 </p>
               )}
               {activity.kind === "search" && activity.sources.length > 0 && (

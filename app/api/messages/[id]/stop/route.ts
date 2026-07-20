@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { Json } from "@/lib/database.types";
 import { getAllowedUser } from "@/lib/supabase/auth-user";
 import { finalizeConversationTitle } from "@/lib/title-finalization";
 import { normalizeReasoningBlocks } from "@/lib/reasoning-block";
@@ -47,21 +48,28 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     .maybeSingle();
   if (!assistant) return NextResponse.json({ error: "Message not found." }, { status: 404 });
 
-  const { error } = await auth.supabase
-    .from("messages")
-    .update({
-      content,
-      reasoning_content: reasoning,
-      reasoning_blocks: reasoningBlocks,
-      tool_activity: toolActivity,
-      duration_ms: durationMs,
-      status: "stopped",
-    })
-    .eq("id", id)
-    .eq("role", "assistant")
-    .eq("status", "streaming");
-
-  if (error) return NextResponse.json({ error: "Unable to stop the response." }, { status: 500 });
+  const { data: stopResult, error: stopError } = await auth.supabase.rpc("stop_agent_run", {
+    p_assistant_message_id: id,
+    p_content: content,
+    p_reasoning: reasoning,
+    p_reasoning_blocks: reasoningBlocks as unknown as Json,
+    p_tool_activity: toolActivity as unknown as Json,
+    p_duration_ms: durationMs,
+  });
+  if (stopError) return NextResponse.json({ error: "Unable to stop the saved run." }, { status: 500 });
+  if (stopResult === "terminal") {
+    return NextResponse.json({ error: "This response already finished." }, { status: 409 });
+  }
+  if (stopResult === "no_run") {
+    const { data: stopped, error } = await auth.supabase.from("messages").update({
+      content, reasoning_content: reasoning, reasoning_blocks: reasoningBlocks,
+      tool_activity: toolActivity, duration_ms: durationMs, status: "stopped",
+    }).eq("id", id).eq("role", "assistant").in("status", ["streaming", "awaiting_tool"])
+      .select("id").maybeSingle();
+    if (error || !stopped) {
+      return NextResponse.json({ error: "Unable to stop the response." }, { status: 409 });
+    }
+  }
 
   const { data: conversation } = await auth.supabase
     .from("conversations")

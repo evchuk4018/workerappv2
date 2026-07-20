@@ -8,7 +8,9 @@ function blockState(
   isLast: boolean,
   status: MessageStatus,
 ) {
-  if (isLast && status === "streaming" && block.duration_ms === null) return "active" as const;
+  if (isLast && (status === "streaming" || status === "awaiting_tool") && block.duration_ms === null) {
+    return "active" as const;
+  }
   if (isLast && status === "stopped" && block.duration_ms === null) return "stopped" as const;
   return "completed" as const;
 }
@@ -45,9 +47,10 @@ export function ReasoningTimeline({ message }: { message: ChatMessage }) {
     );
   }
 
-  const showPlaceholder = message.status === "streaming" && !message.content;
+  const showPlaceholder = (message.status === "streaming" || message.status === "awaiting_tool")
+    && !message.content;
   if (!message.reasoning_content && !message.tool_activity.length && !showPlaceholder) return null;
-  const state = message.status === "streaming"
+  const state = message.status === "streaming" || message.status === "awaiting_tool"
     ? "active" as const
     : message.status === "stopped"
       ? "stopped" as const

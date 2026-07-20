@@ -3,6 +3,7 @@ import { ChatApp } from "@/components/chat/chat-app";
 import { getAllowedUser } from "@/lib/supabase/auth-user";
 import { normalizeReasoningBlocks } from "@/lib/reasoning-block";
 import { normalizeToolActivities } from "@/lib/tool-activity";
+import { attachFilesToMessages } from "@/lib/message-files";
 
 export async function ChatLoader({ conversationId }: { conversationId?: string }) {
   const auth = await getAllowedUser();
@@ -26,16 +27,19 @@ export async function ChatLoader({ conversationId }: { conversationId?: string }
 
     if (conversation) {
       validConversationId = conversation.id;
-      const { data } = await auth.supabase
-        .from("messages")
-        .select("id,conversation_id,role,content,reasoning_content,reasoning_blocks,tool_activity,model_preset,status,duration_ms,created_at")
-        .eq("conversation_id", conversation.id)
-        .order("created_at", { ascending: true });
-      messages = data?.map((item) => ({
+      const [{ data }, { data: files }] = await Promise.all([
+        auth.supabase.from("messages")
+          .select("id,conversation_id,role,content,reasoning_content,reasoning_blocks,tool_activity,model_preset,status,duration_ms,created_at")
+          .eq("conversation_id", conversation.id).order("created_at", { ascending: true }),
+        auth.supabase.from("chat_files")
+          .select("id,message_id,kind,original_name,mime_type,size_bytes,created_at")
+          .eq("conversation_id", conversation.id),
+      ]);
+      messages = attachFilesToMessages(data?.map((item) => ({
         ...item,
         reasoning_blocks: normalizeReasoningBlocks(item.reasoning_blocks),
         tool_activity: normalizeToolActivities(item.tool_activity),
-      })) ?? null;
+      })) ?? [], files ?? []);
     }
   }
 

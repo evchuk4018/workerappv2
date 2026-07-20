@@ -5,6 +5,8 @@ import { ModelMenu } from "@/components/chat/model-menu";
 import type { ModelPreset } from "@/lib/models";
 import type { ChatMessage } from "@/lib/types";
 import type { MemoryMode } from "@/lib/memory/types";
+import { AttachmentChips, type AttachmentItem } from "./attachment-chips";
+import { AttachmentPicker } from "./attachment-picker";
 
 interface ChatPanelProps {
   messages: ChatMessage[];
@@ -23,6 +25,9 @@ interface ChatPanelProps {
   onSend: () => void;
   onStop: () => void;
   onDismissError: () => void;
+  attachments: AttachmentItem[];
+  onFilesSelected: (files: File[]) => void;
+  onRemoveAttachment: (id: string) => void;
 }
 
 export function ChatPanel({
@@ -42,6 +47,9 @@ export function ChatPanel({
   onSend,
   onStop,
   onDismissError,
+  attachments,
+  onFilesSelected,
+  onRemoveAttachment,
 }: ChatPanelProps) {
   useEffect(() => {
     if (!textareaRef.current) return;
@@ -89,6 +97,11 @@ export function ChatPanel({
           </div>
         )}
         <div className="composer">
+          <AttachmentChips
+            attachments={attachments}
+            onRemove={onRemoveAttachment}
+            disabled={isStreaming}
+          />
           <textarea
             ref={textareaRef}
             value={input}
@@ -100,6 +113,7 @@ export function ChatPanel({
             aria-label="Message DeepSeek"
           />
           <div className="composer-toolbar">
+            <AttachmentPicker onFilesSelected={onFilesSelected} disabled={isStreaming} />
             <ModelMenu value={preset} onChange={onPresetChange} disabled={isStreaming} />
             <button
               className={`memory-mode-button ${memoryMode === "off" ? "memory-off" : ""}`}

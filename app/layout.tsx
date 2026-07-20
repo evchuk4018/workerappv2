@@ -3,6 +3,7 @@ import "katex/dist/katex.min.css";
 import "./globals.css";
 import "./chat.css";
 import "./controls.css";
+import "./python-tools.css";
 import "./settings.css";
 import "./responsive.css";
 

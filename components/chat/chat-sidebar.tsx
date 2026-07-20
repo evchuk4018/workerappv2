@@ -1,5 +1,5 @@
 import type { RefObject } from "react";
-import { Search, Settings, Sparkles, SquarePen, X } from "lucide-react";
+import { Search, Settings, Sparkles, SquarePen, Trash2, X } from "lucide-react";
 import type { ConversationSummary } from "@/lib/types";
 
 interface ChatSidebarProps {
@@ -13,6 +13,7 @@ interface ChatSidebarProps {
   onSearch: () => void;
   onSettings: () => void;
   onOpenConversation: (id: string) => void;
+  onDeleteConversation: (id: string) => void;
 }
 
 export function ChatSidebar({
@@ -26,6 +27,7 @@ export function ChatSidebar({
   onSearch,
   onSettings,
   onOpenConversation,
+  onDeleteConversation,
 }: ChatSidebarProps) {
   return (
     <aside className={`sidebar${open ? " is-open" : ""}`}>
@@ -51,16 +53,26 @@ export function ChatSidebar({
       <div className="recent-heading">Recent</div>
       <div className="conversation-list">
         {conversations.length ? conversations.map((conversation) => (
-          <button
-            type="button"
-            key={conversation.id}
-            className={conversation.id === activeConversationId ? "active" : ""}
-            onClick={() => onOpenConversation(conversation.id)}
-            disabled={isStreaming}
-            title={conversation.title}
-          >
-            {conversation.title}
-          </button>
+          <div className="conversation-row" key={conversation.id}>
+            <button
+              type="button"
+              className={conversation.id === activeConversationId ? "active" : ""}
+              onClick={() => onOpenConversation(conversation.id)}
+              disabled={isStreaming}
+              title={conversation.title}
+            >
+              {conversation.title}
+            </button>
+            <button
+              type="button"
+              className="delete-conversation"
+              onClick={() => onDeleteConversation(conversation.id)}
+              disabled={isStreaming}
+              aria-label={`Delete ${conversation.title}`}
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
         )) : <p className="empty-recents">Your chats will appear here.</p>}
       </div>
 

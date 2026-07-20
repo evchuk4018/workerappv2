@@ -6,6 +6,7 @@ import remarkMath from "remark-math";
 import { AlertCircle } from "lucide-react";
 import type { ComponentPropsWithoutRef } from "react";
 import type { ChatMessage } from "@/lib/types";
+import { AttachmentChips } from "./attachment-chips";
 import { ReasoningTimeline } from "./reasoning-timeline";
 
 function LinkedImage({ src, alt }: ComponentPropsWithoutRef<"img">) {
@@ -19,7 +20,10 @@ export function Message({ message }: { message: ChatMessage }) {
   if (message.role === "user") {
     return (
       <article className="message-row user-row">
-        <div className="user-bubble">{message.content}</div>
+        <div className="user-message-content">
+          <div className="user-bubble">{message.content}</div>
+          <AttachmentChips attachments={message.attachments ?? []} />
+        </div>
       </article>
     );
   }

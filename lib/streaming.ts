@@ -1,4 +1,14 @@
 import type { ToolActivity } from "@/lib/tool-activity";
+import type { PythonToolRequest } from "@/lib/deepseek/python-tool";
+
+export interface PythonStreamInput {
+  fileId: string;
+  objectPath: string;
+  path: string;
+  name: string;
+  mimeType: string;
+  sizeBytes: number;
+}
 
 export type StreamEvent =
   | {
@@ -12,6 +22,13 @@ export type StreamEvent =
   | { type: "reasoning_round_complete"; roundIndex: number; durationMs: number }
   | { type: "content_delta"; delta: string }
   | { type: "tool_activity"; activity: ToolActivity }
+  | {
+      type: "python_request";
+      runId: string;
+      callToken: string;
+      request: PythonToolRequest;
+      inputs: PythonStreamInput[];
+    }
   | { type: "title"; conversationId: string; title: string }
   | { type: "done"; durationMs: number; status: "completed" | "stopped" }
   | { type: "error"; message: string };
